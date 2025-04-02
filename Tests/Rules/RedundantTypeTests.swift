@@ -592,7 +592,7 @@ class RedundantTypeTests: XCTestCase {
     func testRedundantTypeDoesNothingIfLetAfterComma() {
         let input = "if check == true, let foo: Foo = Foo() {}"
         let options = FormatOptions(propertyTypes: .explicit)
-        testFormatting(for: input, rule: .redundantType, options: options, exclude: [.propertyTypes])
+        testFormatting(for: input, rule: .redundantType, options: options, exclude: [.propertyTypes, .redundantBool])
     }
 
     func testRedundantTypeWorksAfterIf() {

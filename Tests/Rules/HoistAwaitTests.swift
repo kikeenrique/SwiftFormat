@@ -229,6 +229,6 @@ class HoistAwaitTests: XCTestCase {
     func testNoHoistAwaitInMacroArgument() {
         let input = "#expect (await monitor.isAvailable == false)"
         testFormatting(for: input, rule: .hoistAwait,
-                       options: FormatOptions(swiftVersion: "5.5"), exclude: [.spaceAroundParens])
+                       options: FormatOptions(swiftVersion: "5.5"), exclude: [.spaceAroundParens, .redundantBool])
     }
 }

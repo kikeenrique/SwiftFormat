@@ -39,19 +39,22 @@ class IsEmptyTests: XCTestCase {
     func testOptionalCountEqualsZero() {
         let input = "if foo?.count == 0 {}"
         let output = "if foo?.isEmpty == true {}"
-        testFormatting(for: input, output, rule: .isEmpty)
+        testFormatting(for: input, output, rule: .isEmpty,
+                       exclude: [.redundantBool])
     }
 
     func testOptionalChainCountEqualsZero() {
         let input = "if foo?.bar.count == 0 {}"
         let output = "if foo?.bar.isEmpty == true {}"
-        testFormatting(for: input, output, rule: .isEmpty)
+        testFormatting(for: input, output, rule: .isEmpty,
+                       exclude: [.redundantBool])
     }
 
     func testCompoundIfOptionalCountEqualsZero() {
         let input = "if foo, bar?.count == 0 {}"
         let output = "if foo, bar?.isEmpty == true {}"
-        testFormatting(for: input, output, rule: .isEmpty)
+        testFormatting(for: input, output, rule: .isEmpty,
+                       exclude: [.redundantBool])
     }
 
     func testTernaryCountEqualsZero() {
@@ -104,19 +107,22 @@ class IsEmptyTests: XCTestCase {
     func testOptionalCountNotEqualToZero() {
         let input = "if foo?.count != 0 {}" // nil evaluates to true
         let output = "if foo?.isEmpty != true {}"
-        testFormatting(for: input, output, rule: .isEmpty)
+        testFormatting(for: input, output, rule: .isEmpty,
+                       exclude: [.redundantBool])
     }
 
     func testOptionalChainCountNotEqualToZero() {
         let input = "if foo?.bar.count != 0 {}" // nil evaluates to true
         let output = "if foo?.bar.isEmpty != true {}"
-        testFormatting(for: input, output, rule: .isEmpty)
+        testFormatting(for: input, output, rule: .isEmpty,
+                       exclude: [.redundantBool])
     }
 
     func testCompoundIfOptionalCountNotEqualToZero() {
         let input = "if foo, bar?.count != 0 {}"
         let output = "if foo, bar?.isEmpty != true {}"
-        testFormatting(for: input, output, rule: .isEmpty)
+        testFormatting(for: input, output, rule: .isEmpty,
+                       exclude: [.redundantBool])
     }
 
     // edge cases
