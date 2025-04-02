@@ -38,6 +38,7 @@
 * [preferForLoop](#preferForLoop)
 * [preferKeyPath](#preferKeyPath)
 * [redundantBackticks](#redundantBackticks)
+* [redundantBool](#redundantBool)
 * [redundantBreak](#redundantBreak)
 * [redundantClosure](#redundantClosure)
 * [redundantExtensionACL](#redundantExtensionACL)
@@ -1705,6 +1706,30 @@ Remove redundant backticks around identifiers.
 ```diff
 - func foo(with `default`: Int) {}
 + func foo(with default: Int) {}
+```
+
+</details>
+<br/>
+
+## redundantBool
+
+Rule to remove redundant boolean comparisons (`== true` → `value`, `== false` → `!value`, `!= true` → `!value`, `!= false` → `value`).
+
+<details>
+<summary>Examples</summary>
+
+```diff
+- if isEnabled == true { print("On") }
++ if isEnabled { print("On") }
+
+- if isDisabled == false { print("Off") }
++ if !isDisabled { print("Off") }
+
+- if status != true { print("Inactive") }
++ if !status { print("Inactive") }
+
+- if status != false { print("Active") }
++ if status { print("Active") }
 ```
 
 </details>
