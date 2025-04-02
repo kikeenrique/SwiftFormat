@@ -150,5 +150,108 @@ class RedundantBoolTests: XCTestCase {
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
-    
+    func testRedundantComparisonWithNotTrue() throws {
+        let input = """
+        if isEnabled != true {
+            print("Not Enabled")
+        }
+        """
+        let output = """
+        if !isEnabled {
+            print("Not Enabled")
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testRedundantComparisonWithNotFalse() throws {
+        let input = """
+        if isDisabled != false {
+            print("Disabled")
+        }
+        """
+        let output = """
+        if isDisabled {
+            print("Disabled")
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testWhileLoopWithNotTrue() throws {
+        let input = """
+        while running != true {
+            doSomething()
+        }
+        """
+        let output = """
+        while !running {
+            doSomething()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testGuardStatementWithNotFalse() throws {
+        let input = """
+        guard status != false else {
+            return
+        }
+        """
+        let output = """
+        guard status else {
+            return
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testTernaryOperatorWithNotTrue() throws {
+        let input = """
+        let status = isOnline != true ? "Offline" : "Online"
+        """
+        let output = """
+        let status = !isOnline ? "Offline" : "Online"
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testTernaryOperatorWithNotFalse() throws {
+        let input = """
+        let status = isOnline != false ? "Online" : "Offline"
+        """
+        let output = """
+        let status = isOnline ? "Online" : "Offline"
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testMultipleConditionsWithNotTrue() throws {
+        let input = """
+        if isReady != true && isComplete != true {
+            stop()
+        }
+        """
+        let output = """
+        if !isReady && !isComplete {
+            stop()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool,
+                       exclude: [.andOperator])
+    }
+
+    func testMultipleConditionsWithNotFalse() throws {
+        let input = """
+        if isReady != false || isComplete != false {
+            proceed()
+        }
+        """
+        let output = """
+        if isReady || isComplete {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
 }
