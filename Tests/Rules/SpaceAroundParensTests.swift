@@ -146,7 +146,7 @@ class SpaceAroundParensTests: XCTestCase {
     func testSpaceBetweenIfAndCondition() {
         let input = "if(a || b) == true {}"
         let output = "if (a || b) == true {}"
-        testFormatting(for: input, output, rule: .spaceAroundParens)
+        testFormatting(for: input, output, rule: .spaceAroundParens, exclude: [.redundantBool])
     }
 
     func testNoSpaceBetweenArrayLiteralAndParen() {

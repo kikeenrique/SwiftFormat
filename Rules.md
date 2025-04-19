@@ -1725,11 +1725,22 @@ Rule to remove redundant boolean comparisons (`== true` → `value`, `== false` 
 - if isDisabled == false { print("Off") }
 + if !isDisabled { print("Off") }
 
-- if status != true { print("Inactive") }
-+ if !status { print("Inactive") }
+- if isOnline != true { print("Offline") }
++ if !isOnline { print("Offline") }
 
-- if status != false { print("Active") }
-+ if status { print("Active") }
+- if isReady != false { print("Ready") }
++ if isReady { print("Ready") }
+
+- while running == true {}
++ while running {}
+
+- guard status == false else {}
++ guard !status else {}
+
+// ✅ These cases are NOT modified (optional Bool)
+- if formatter.token(at: closingBraceIndex - 1)?.isSpace == true {}
+- if formatter.token(at: nextIndex)?.isLinebreak != true {}
+
 ```
 
 </details>

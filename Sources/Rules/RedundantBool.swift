@@ -15,31 +15,53 @@ public extension FormatRule {
         sharedOptions: []
     ) { formatter in
         formatter.forEachToken { i, token in
-            guard case let .operator(op, .infix) = token, op == "==" || op == "!=" else { return }
+            guard case let .operator(op, .infix) = token, op == "==" || op == "!=" else {
+                return
+            }
 
+            // Check for Boolean after operator compare
             guard let prevIndex = formatter.index(before: i, where: { !$0.isSpaceOrComment }),
                   let nextIndex = formatter.index(after: i, where: { !$0.isSpaceOrComment }),
-                  case .identifier = formatter.tokens[prevIndex],
                   case let .identifier(value) = formatter.tokens[nextIndex],
                   value == "true" || value == "false"
             else {
                 return
             }
 
-            if let firstAfterIdentifier = formatter.index(before: i, where: { $0.isSpaceOrComment }) {
-                if op == "==" {
-                    if value == "true" {
-                        formatter.removeTokens(in: firstAfterIdentifier ... nextIndex)
-                    } else { // value == "false"
-                        formatter.removeTokens(in: firstAfterIdentifier ... nextIndex)
-                        formatter.insert(.operator("!", .prefix), at: prevIndex)
+            // Ensure previous identifier is NOT an optional Boolean
+            if let tokenBeforePrev = formatter.index(before: prevIndex, where: { !$0.isSpaceOrComment }),
+               case .operator("?", .postfix) = formatter.tokens[tokenBeforePrev]
+            {
+                return // Skip modifying optional Bool checks
+            }
+
+            if let firstBeforeIdentifier = formatter.index(before: i, where: { $0.isSpaceOrComment }) {
+                if value == "true" {
+                    if op == "==" {
+                        // Remove `== true`
+                        formatter.removeTokens(in: firstBeforeIdentifier ... nextIndex)
+                    } else {
+                        // Replace `!= true` with `!value`
+                        formatter.removeTokens(in: firstBeforeIdentifier ... nextIndex)
+                        if let beforeExpressionIndex = formatter.index(before: prevIndex, where: { !$0.isOperator(".") && !$0.isIdentifier }) {
+                            formatter.insert(.operator("!", .prefix), at: beforeExpressionIndex + 1)
+                        } else {
+                            formatter.insert(.operator("!", .prefix), at: prevIndex)
+                        }
                     }
-                } else if op == "!=" {
-                    if value == "true" {
-                        formatter.removeTokens(in: firstAfterIdentifier ... nextIndex)
-                        formatter.insert(.operator("!", .prefix), at: prevIndex)
-                    } else { // value == "false"
-                        formatter.removeTokens(in: firstAfterIdentifier ... nextIndex)
+                } else if value == "false" {
+                    if op == "==" {
+                        // Replace `== false` with `!value`
+                        formatter.removeTokens(in: firstBeforeIdentifier ... nextIndex)
+                        print("")
+                        if let beforeExpressionIndex = formatter.index(before: prevIndex, where: { !$0.isOperator(".") && !$0.isIdentifier }) {
+                            formatter.insert(.operator("!", .prefix), at: beforeExpressionIndex + 1)
+                        } else {
+                            formatter.insert(.operator("!", .prefix), at: prevIndex)
+                        }
+                    } else {
+                        // Remove `!= false`
+                        formatter.removeTokens(in: firstBeforeIdentifier ... nextIndex)
                     }
                 }
             }
@@ -53,11 +75,22 @@ public extension FormatRule {
         - if isDisabled == false { print("Off") }
         + if !isDisabled { print("Off") }
 
-        - if status != true { print("Inactive") }
-        + if !status { print("Inactive") }
+        - if isOnline != true { print("Offline") }
+        + if !isOnline { print("Offline") }
 
-        - if status != false { print("Active") }
-        + if status { print("Active") }
+        - if isReady != false { print("Ready") }
+        + if isReady { print("Ready") }
+
+        - while running == true {}
+        + while running {}
+
+        - guard status == false else {}
+        + guard !status else {}
+
+        // ✅ These cases are NOT modified (optional Bool)
+        - if formatter.token(at: closingBraceIndex - 1)?.isSpace == true {}
+        - if formatter.token(at: nextIndex)?.isLinebreak != true {}
+
         ```
         """
     }

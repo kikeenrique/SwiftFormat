@@ -107,6 +107,26 @@ class RedundantBoolTests: XCTestCase {
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
+    func testLetAssignmentCombinedVariableWithTrue() throws {
+        let input = """
+        let isActive = resourceValues.isDirectory == true
+        """
+        let output = """
+        let isActive = resourceValues.isDirectory
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testLetAssignmentCombinedVariableWithFalse() throws {
+        let input = """
+        let isInactive = resourceValues.isDirectory == false
+        """
+        let output = """
+        let isInactive = !resourceValues.isDirectory
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
     func testMultipleConditionsSeparatorAndWithTrue() throws {
         let input = """
         if isReady == true && isComplete == true {
@@ -250,6 +270,63 @@ class RedundantBoolTests: XCTestCase {
         let output = """
         if isReady || isComplete {
             proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testPropertyBooleanComparisonWithTrue() throws {
+        let input = """
+        if resourceValues.isDirectory == true {
+            print("Is a directory")
+        }
+        """
+        let output = """
+        if resourceValues.isDirectory {
+            print("Is a directory")
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testPropertyBooleanComparisonWithFalse() throws {
+        let input = """
+        if resourceValues.isDirectory == false {
+            print("Not a directory")
+        }
+        """
+        let output = """
+        if !resourceValues.isDirectory {
+            print("Not a directory")
+        }
+        """
+
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testPropertyBooleanComparisonWithNotTrue() throws {
+        let input = """
+        if resourceValues.isDirectory != true {
+            print("Not Enabled")
+        }
+        """
+        let output = """
+        if !resourceValues.isDirectory {
+            print("Not Enabled")
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testPropertyBooleanComparisonWithNotFalse() throws {
+        let input = """
+        if resourceValues.isDirectory != false {
+            print("Disabled")
+        }
+        """
+        let output = """
+        if resourceValues.isDirectory {
+            print("Disabled")
         }
         """
         testFormatting(for: input, output, rule: .redundantBool)
