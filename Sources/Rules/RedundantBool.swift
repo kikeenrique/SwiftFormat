@@ -20,19 +20,21 @@ public extension FormatRule {
             }
 
             // Check for Boolean after operator compare
-            guard let prevIndex = formatter.index(before: i, where: { !$0.isSpaceOrComment }),
-                  let nextIndex = formatter.index(after: i, where: { !$0.isSpaceOrComment }),
+            guard let nextIndex = formatter.index(after: i, where: { !$0.isSpaceOrComment }),
                   case let .identifier(value) = formatter.tokens[nextIndex],
                   value == "true" || value == "false"
             else {
                 return
             }
 
-            // Ensure previous identifier is NOT an optional Boolean
-            if let tokenBeforePrev = formatter.index(before: prevIndex, where: { !$0.isSpaceOrComment }),
-               case .operator("?", .postfix) = formatter.tokens[tokenBeforePrev]
-            {
-                return // Skip modifying optional Bool checks
+            var expressionIndex = i
+            while let before = formatter.index(before: expressionIndex, where: { !$0.isKeyword }) {
+                let token = formatter.tokens[before]
+                if token == .operator("?", .postfix) {
+                    return // optional access detected, skip
+                } else {
+                    expressionIndex = before
+                }
             }
 
             if let firstBeforeIdentifier = formatter.index(before: i, where: { $0.isSpaceOrComment }) {
@@ -43,21 +45,24 @@ public extension FormatRule {
                     } else {
                         // Replace `!= true` with `!value`
                         formatter.removeTokens(in: firstBeforeIdentifier ... nextIndex)
-                        if let beforeExpressionIndex = formatter.index(before: prevIndex, where: { !$0.isOperator(".") && !$0.isIdentifier }) {
-                            formatter.insert(.operator("!", .prefix), at: beforeExpressionIndex + 1)
-                        } else {
-                            formatter.insert(.operator("!", .prefix), at: prevIndex)
+                        if let prevIndex = formatter.index(before: i, where: { !$0.isSpaceOrComment }) {
+                            if let beforeExpressionIndex = formatter.index(before: prevIndex, where: { !$0.isOperator(".") && !$0.isIdentifier }) {
+                                formatter.insert(.operator("!", .prefix), at: beforeExpressionIndex + 1)
+                            } else {
+                                formatter.insert(.operator("!", .prefix), at: prevIndex)
+                            }
                         }
                     }
                 } else if value == "false" {
                     if op == "==" {
                         // Replace `== false` with `!value`
                         formatter.removeTokens(in: firstBeforeIdentifier ... nextIndex)
-                        print("")
-                        if let beforeExpressionIndex = formatter.index(before: prevIndex, where: { !$0.isOperator(".") && !$0.isIdentifier }) {
-                            formatter.insert(.operator("!", .prefix), at: beforeExpressionIndex + 1)
-                        } else {
-                            formatter.insert(.operator("!", .prefix), at: prevIndex)
+                        if let prevIndex = formatter.index(before: i, where: { !$0.isSpaceOrComment }) {
+                            if let beforeExpressionIndex = formatter.index(before: prevIndex, where: { !$0.isOperator(".") && !$0.isIdentifier }) {
+                                formatter.insert(.operator("!", .prefix), at: beforeExpressionIndex + 1)
+                            } else {
+                                formatter.insert(.operator("!", .prefix), at: prevIndex)
+                            }
                         }
                     } else {
                         // Remove `!= false`

@@ -331,4 +331,72 @@ class RedundantBoolTests: XCTestCase {
         """
         testFormatting(for: input, output, rule: .redundantBool)
     }
+
+    func testOptionalBooleanComparisonWithNotTrue() throws {
+        let input = """
+        if resourceValues?.isDirectory != true {
+            print("Not Enabled")
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalBooleanComparisonWithNotFalse() throws {
+        let input = """
+        if resourceValues?.isDirectory != false {
+            print("Disabled")
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalParenBooleanComparisonWithNotTrue() throws {
+        let input = """
+        if options.rules?.contains("wrapEnumCases") == true {
+            print("Not Enabled")
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalParenBooleanComparisonWithNotFalse() throws {
+        let input = """
+        if options.rules?.contains("unusedArguments") == false {
+            print("Disabled")
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testWhileOptionalBooleanComparisonWithNotTrue() throws {
+        let input = """
+        while resourceValues?.isDirectory != true {
+            print("Not Enabled")
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testWhileOptionalBooleanComparisonWithNotFalse() throws {
+        let input = """
+        while resourceValues?.isDirectory != false {
+            print("Disabled")
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testLetOptionalBooleanComparisonWithNotTrue() throws {
+        let input = """
+        let status = resourceValues?.isOnline != true ? "Offline" : "Online"
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testLetOptionalBooleanComparisonWithNotFalse() throws {
+        let input = """
+        let status = resourceValues?.isOnline != false ? "Online" : "Offline"
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
 }
