@@ -15,7 +15,7 @@ class Order: ObservableObject, Codable {
 
     var specialRequestEnabled = false {
       didSet {
-        if specialRequestEnabled == false {
+        if !specialRequestEnabled {
           extraFrosting = false
           addSprinkles = false
         }
