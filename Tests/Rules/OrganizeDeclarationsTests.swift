@@ -463,7 +463,7 @@ class OrganizeDeclarationsTests: XCTestCase {
             for: input, output,
             rule: .organizeDeclarations,
             options: FormatOptions(categoryMarkComment: "MARK: %c", organizationMode: .type),
-            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope]
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
         )
     }
 
@@ -537,7 +537,7 @@ class OrganizeDeclarationsTests: XCTestCase {
             for: input, output,
             rule: .organizeDeclarations,
             options: FormatOptions(categoryMarkComment: "MARK: %c", organizationMode: .type),
-            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope]
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
         )
     }
 
@@ -574,7 +574,7 @@ class OrganizeDeclarationsTests: XCTestCase {
                 visibilityOrder: ["private", "internal", "public"],
                 typeOrder: DeclarationType.allCases.map(\.rawValue)
             ),
-            exclude: [.blankLinesAtStartOfScope]
+            exclude: [.blankLinesAtStartOfScope, .privateStateVariables]
         )
     }
 
@@ -1568,9 +1568,9 @@ class OrganizeDeclarationsTests: XCTestCase {
 
             init() {}
 
-            // Public
+            // mark: Public
 
-            // - Public
+            // mark - Public
 
             public func bar() {}
 
@@ -2302,6 +2302,7 @@ class OrganizeDeclarationsTests: XCTestCase {
         }
         """
 
+        // easy to start with?
         testFormatting(
             for: input, output,
             rule: .organizeDeclarations,
@@ -2767,7 +2768,7 @@ class OrganizeDeclarationsTests: XCTestCase {
             for: input, output,
             rule: .organizeDeclarations,
             options: FormatOptions(organizeTypes: ["struct"], organizationMode: .visibility),
-            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope]
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
         )
     }
 
@@ -2834,7 +2835,7 @@ class OrganizeDeclarationsTests: XCTestCase {
             for: input, output,
             rule: .organizeDeclarations,
             options: FormatOptions(organizeTypes: ["struct"], organizationMode: .visibility),
-            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope]
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
         )
     }
 
@@ -3023,6 +3024,222 @@ class OrganizeDeclarationsTests: XCTestCase {
             for: input, output,
             rule: .organizeDeclarations,
             exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .consecutiveBlankLines, .trailingSpace, .consecutiveSpaces, .indent]
+        )
+    }
+
+    func testSortSwiftUIPropertyWrappersSubCategoryAlphabetically() {
+        let input = """
+        struct ContentView: View {
+            init() {}
+
+            @Environment(\\.colorScheme) var colorScheme
+            @State var foo: Foo
+            @Binding var isOn: Bool
+            @Environment(\\.quux) var quux: Quux
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        let output = """
+        struct ContentView: View {
+
+            // MARK: Lifecycle
+
+            init() {}
+
+            // MARK: Internal
+
+            @Binding var isOn: Bool
+            @Environment(\\.colorScheme) var colorScheme
+            @Environment(\\.quux) var quux: Quux
+            @State var foo: Foo
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        testFormatting(
+            for: input, output,
+            rule: .organizeDeclarations,
+            options: FormatOptions(
+                organizeTypes: ["struct"],
+                organizationMode: .visibility,
+                blankLineAfterSubgroups: false,
+                swiftUIPropertiesSortMode: .alphabetize
+            ),
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
+        )
+    }
+
+    func testSortSwiftUIWrappersByTypeAndMaintainGroupSpacingAlphabetically() {
+        let input = """
+        struct ContentView: View {
+            init() {}
+
+            @State var foo: Foo
+            @State var bar: Bar
+
+            @Environment(\\.colorScheme) var colorScheme
+            @Environment(\\.quux) var quux: Quux
+
+            @Binding var isOn: Bool
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        let output = """
+        struct ContentView: View {
+
+            // MARK: Lifecycle
+
+            init() {}
+
+            // MARK: Internal
+
+            @Binding var isOn: Bool
+
+            @Environment(\\.colorScheme) var colorScheme
+            @Environment(\\.quux) var quux: Quux
+
+            @State var foo: Foo
+            @State var bar: Bar
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        testFormatting(
+            for: input, output,
+            rule: .organizeDeclarations,
+            options: FormatOptions(
+                organizeTypes: ["struct"],
+                organizationMode: .visibility,
+                blankLineAfterSubgroups: false,
+                swiftUIPropertiesSortMode: .alphabetize
+            ),
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
+        )
+    }
+
+    func testSortSwiftUIPropertyWrappersSubCategoryPreservingGroupPosition() {
+        let input = """
+        struct ContentView: View {
+            init() {}
+
+            @Environment(\\.colorScheme) var colorScheme
+            @State var foo: Foo
+            @Binding var isOn: Bool
+            @Environment(\\.quux) var quux: Quux
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        let output = """
+        struct ContentView: View {
+
+            // MARK: Lifecycle
+
+            init() {}
+
+            // MARK: Internal
+
+            @Environment(\\.colorScheme) var colorScheme
+            @Environment(\\.quux) var quux: Quux
+            @State var foo: Foo
+            @Binding var isOn: Bool
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        testFormatting(
+            for: input, output,
+            rule: .organizeDeclarations,
+            options: FormatOptions(
+                organizeTypes: ["struct"],
+                organizationMode: .visibility,
+                blankLineAfterSubgroups: false,
+                swiftUIPropertiesSortMode: .firstAppearanceSort
+            ),
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
+        )
+    }
+
+    func testSortSwiftUIWrappersByTypeAndMaintainGroupSpacingAndPosition() {
+        let input = """
+        struct ContentView: View {
+            init() {}
+
+            @State var foo: Foo
+            @State var bar: Bar
+
+            @Environment(\\.colorScheme) var colorScheme
+            @Environment(\\.quux) var quux: Quux
+
+            @Binding var isOn: Bool
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        let output = """
+        struct ContentView: View {
+
+            // MARK: Lifecycle
+
+            init() {}
+
+            // MARK: Internal
+
+            @State var foo: Foo
+            @State var bar: Bar
+
+            @Environment(\\.colorScheme) var colorScheme
+            @Environment(\\.quux) var quux: Quux
+
+            @Binding var isOn: Bool
+
+            @ViewBuilder
+            var body: some View {
+                Toggle(label, isOn: $isOn)
+            }
+        }
+        """
+
+        testFormatting(
+            for: input, output,
+            rule: .organizeDeclarations,
+            options: FormatOptions(
+                organizeTypes: ["struct"],
+                organizationMode: .visibility,
+                blankLineAfterSubgroups: false,
+                swiftUIPropertiesSortMode: .firstAppearanceSort
+            ),
+            exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .privateStateVariables]
         )
     }
 
@@ -3311,5 +3528,330 @@ class OrganizeDeclarationsTests: XCTestCase {
         )
 
         testFormatting(for: input, rule: .organizeDeclarations, options: options)
+    }
+
+    func testFixesSpacingAfterMarks() {
+        let input = """
+        class Foo {
+            // MARK: Lifecycle
+            init() {}
+            // MARK: Internal
+            let bar = "bar"
+        }
+        """
+
+        let output = """
+        class Foo {
+
+            // MARK: Lifecycle
+
+            init() {}
+
+            // MARK: Internal
+
+            let bar = "bar"
+        }
+        """
+
+        testFormatting(for: input, output, rule: .organizeDeclarations, exclude: [.blankLinesAtStartOfScope])
+    }
+
+    func testRemovesUnnecessaryMark() {
+        let input = """
+        class Foo {
+
+            // MARK: Lifecycle
+
+            init() {}
+
+            // MARK: Internal
+
+            // MARK: Internal
+
+            let bar = "bar"
+
+            // MARK: Internal
+
+            let baaz = "baaz"
+        }
+        """
+
+        let output = """
+        class Foo {
+
+            // MARK: Lifecycle
+
+            init() {}
+
+            // MARK: Internal
+
+            let bar = "bar"
+
+            let baaz = "baaz"
+        }
+        """
+
+        testFormatting(for: input, output, rule: .organizeDeclarations, exclude: [.blankLinesAtStartOfScope])
+    }
+
+    func testPreservesUnrelatedComments() {
+        let input = """
+        enum Test {
+            /// Test Properties
+            static let foo = "foo"
+            static let bar = "bar"
+            static let baaz = "baaz"
+        }
+        """
+
+        testFormatting(for: input, rule: .organizeDeclarations)
+    }
+
+    func testNoCrashWhenSortingNestedTypeDeclarations1() {
+        let input = """
+        public struct MyType {
+            var foo: Foo {
+                .foo
+            }
+
+            public let a: A
+            public let b: B
+            public let c: C
+            public let d: D
+            public let e: E
+
+            public enum Foo {
+                case foo
+                case bar
+                case baaz
+            }
+        }
+        """
+
+        let output = """
+        public struct MyType {
+
+            // MARK: Public
+
+            public enum Foo {
+                case foo
+                case bar
+                case baaz
+            }
+
+            public let a: A
+            public let b: B
+            public let c: C
+            public let d: D
+            public let e: E
+
+            // MARK: Internal
+
+            var foo: Foo {
+                .foo
+            }
+
+        }
+        """
+
+        let options = FormatOptions(organizeStructThreshold: 0)
+        testFormatting(for: input, output, rule: .organizeDeclarations, options: options, exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope])
+    }
+
+    func testNoCrashWhenSortingNestedTypeDeclarations2() {
+        let input = """
+        public struct MyType {
+            public let a: A
+            public let b: B
+            public let c: C
+            public let d: D
+            public let e: E
+
+            public enum Foo {
+                case foo
+                case bar
+                case baaz
+            }
+        }
+        """
+
+        let output = """
+        public struct MyType {
+            public enum Foo {
+                case foo
+                case bar
+                case baaz
+            }
+
+            public let a: A
+            public let b: B
+            public let c: C
+            public let d: D
+            public let e: E
+
+        }
+        """
+
+        let options = FormatOptions(organizeStructThreshold: 0)
+        testFormatting(for: input, output, rule: .organizeDeclarations, options: options, exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope])
+    }
+
+    func testSortsMultipleLayersOfNestedTypes() {
+        let input = """
+        public struct MyType {
+            public let a: A
+            public let b: B
+            public let c: C
+            public let d: D
+            public let e: E
+
+            public class Foo {
+                class Baaz {
+                    let b: B
+                    public let a: A
+
+                    public class Quux {
+                        let b: B
+                        public let a: A
+                    }
+                }
+
+                let bar: Bar
+                let baaz: Baaz
+
+                public class Bar {
+                    let b: B
+                    public let a: A
+                }
+            }
+        }
+        """
+
+        let output = """
+        public struct MyType {
+            public class Foo {
+
+                // MARK: Public
+
+                public class Bar {
+
+                    // MARK: Public
+
+                    public let a: A
+
+                    // MARK: Internal
+
+                    let b: B
+                }
+
+                // MARK: Internal
+
+                class Baaz {
+
+                    // MARK: Public
+
+                    public class Quux {
+
+                        // MARK: Public
+
+                        public let a: A
+
+                        // MARK: Internal
+
+                        let b: B
+                    }
+
+                    public let a: A
+
+                    // MARK: Internal
+
+                    let b: B
+
+                }
+
+                let bar: Bar
+                let baaz: Baaz
+
+            }
+
+            public let a: A
+            public let b: B
+            public let c: C
+            public let d: D
+            public let e: E
+
+        }
+        """
+
+        testFormatting(for: input, output, rule: .organizeDeclarations, exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope])
+    }
+
+    func testOrganizeDeclarationsSortsEnumNamespace() {
+        let input = """
+        // swiftformat:sort
+        public enum Constants {
+            public static let foo = "foo"
+            public static let bar = "bar"
+            public static let baaz = "baaz"
+        }
+        """
+
+        let output = """
+        // swiftformat:sort
+        public enum Constants {
+            public static let baaz = "baaz"
+            public static let bar = "bar"
+            public static let foo = "foo"
+        }
+        """
+
+        testFormatting(for: input, [output], rules: [.organizeDeclarations, .sortDeclarations])
+    }
+
+    func testIssue2045() {
+        let input = """
+        public final class A {
+
+          // MARK: Lifecycle
+
+          public init(a _: Int) {}
+
+          convenience init() {
+            self.init(a: 0)
+          }
+
+          // MARK: Public
+
+          public func a() {}
+
+          // MARK: Private
+
+          private enum Error: Swift.Error {
+            case e
+          }
+
+          private let a1: Float = 0
+          private lazy var b: String? = ""
+          private let a2 = 0
+
+          private lazy var x: [Any] =
+            if let b {
+              [b]
+            } else if false {
+              []
+            } else {
+              [1, 2]
+            }
+
+          private lazy var y = f()
+
+          private var z: Set<String> = []
+        }
+
+        func f() -> Int { 0 }
+        """
+
+        let options = FormatOptions(indent: "  ")
+        testFormatting(for: input, rule: .organizeDeclarations, options: options, exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope])
     }
 }

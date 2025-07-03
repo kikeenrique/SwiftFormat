@@ -586,7 +586,7 @@ struct _Descriptors {
     let wrapReturnType = OptionDescriptor(
         argumentName: "wrapreturntype",
         displayName: "Wrap Return Type",
-        help: "Wrap return type: \"if-multiline\", \"preserve\" (default)",
+        help: "Wrap return type: \"if-multiline\", \"preserve\", \"never\"",
         keyPath: \.wrapReturnType
     )
     let wrapEffects = OptionDescriptor(
@@ -1123,6 +1123,12 @@ struct _Descriptors {
         help: "Acronyms to auto-capitalize. Defaults to \"ID,URL,UUID\"",
         keyPath: \.acronyms
     )
+    let preserveAcronyms = OptionDescriptor(
+        argumentName: "preserveacronyms",
+        displayName: "Preserve Acronymes",
+        help: "List of symbols to be ignored by the acyronyms rule",
+        keyPath: \.preserveAcronyms
+    )
     let indentStrings = OptionDescriptor(
         argumentName: "indentstrings",
         displayName: "Indent Strings",
@@ -1240,6 +1246,32 @@ struct _Descriptors {
         displayName: "Preserved Symbols",
         help: "Comma-delimited list of symbols to be ignored by the rule",
         keyPath: \.preservedSymbols
+    )
+    let additionalXCTestSymbols = OptionDescriptor(
+        argumentName: "xctestsymbols",
+        displayName: "Additional XCTest symbols",
+        help: "Comma-delimited list of symbols that depend on XCTest",
+        keyPath: \.additionalXCTestSymbols
+    )
+    let swiftUIPropertiesSortMode = OptionDescriptor(
+        argumentName: "sortswiftuiprops",
+        displayName: "Sort SwiftUI Dynamic Properties",
+        help: "Sort SwiftUI props: none, alphabetize, first-appearance-sort",
+        keyPath: \.swiftUIPropertiesSortMode
+    )
+    let equatableMacro = OptionDescriptor(
+        argumentName: "equatablemacro",
+        displayName: "The name and module of an Equatable conformance macro",
+        help: "For example: \"@Equatable,EquatableMacroLib\"",
+        keyPath: \.equatableMacro
+    )
+    let preferFileMacro = OptionDescriptor(
+        argumentName: "filemacro",
+        displayName: "Preferred File Macro",
+        help: "File macro to prefer: \"#file\" (default) or \"#fileID\".",
+        keyPath: \.preferFileMacro,
+        trueValues: ["#file", "file"],
+        falseValues: ["#fileID", "fileID"]
     )
 
     // MARK: - Internal

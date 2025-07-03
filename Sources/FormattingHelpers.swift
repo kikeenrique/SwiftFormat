@@ -329,61 +329,53 @@ extension Formatter {
             startOfScope: Int,
             endOfFunctionScope: Int
         ) {
-            guard token(at: startOfScope) == .startOfScope("("),
-                  let openBracket = index(of: .startOfScope("{"), after: endOfFunctionScope)
-            else { return }
+            guard token(at: startOfScope) == .startOfScope("(") else { return }
 
-            func wrap(before index: Int) {
-                insertSpace(currentIndentForLine(at: index), at: index)
-                insertLinebreak(at: index)
+            let closingParenLine = startOfLine(at: endOfFunctionScope)
+            var cursorIndex = endOfFunctionScope + 1
+            var shouldUnwrapReturnArrow = false
 
-                // Remove any trailing whitespace that is now orphaned on the previous line
-                if tokens[index - 1].is(.space) {
-                    removeToken(at: index - 1)
-                }
-            }
+            if let parsedEffects = parseFunctionDeclarationEffectsClause(at: cursorIndex) {
+                let effectsIndex = parsedEffects.range.lowerBound
+                cursorIndex = parsedEffects.range.upperBound + 1
 
-            if let effectIndex = index(after: endOfFunctionScope, where: {
-                [.keyword("throws"), .identifier("async")].contains($0)
-            }), effectIndex < openBracket {
                 switch options.wrapEffects {
-                case .preserve:
-                    break
+                case .preserve: break
+
                 case .ifMultiline:
                     // If the effect is on the same line as the closing paren, wrap it
-                    if startOfLine(at: endOfFunctionScope) == startOfLine(at: effectIndex) {
-                        wrap(before: effectIndex)
+                    guard closingParenLine == startOfLine(at: effectsIndex) else { break }
+                    cursorIndex += wrapLine(before: effectsIndex)
+                    shouldUnwrapReturnArrow = true
 
-                        // When wrapping the effect, we should also un-wrap any return type
-                        if let returnArrowIndex = index(of: .operator("->", .infix), after: endOfFunctionScope),
-                           returnArrowIndex < openBracket,
-                           let tokenBeforeArrowIndex = index(of: .nonSpaceOrCommentOrLinebreak, before: returnArrowIndex),
-                           startOfLine(at: tokenBeforeArrowIndex) != startOfLine(at: returnArrowIndex)
-                        {
-                            replaceTokens(in: endOfLine(at: tokenBeforeArrowIndex) ..< returnArrowIndex, with: [.space(" ")])
-                        }
-                    }
                 case .never:
-                    if startOfLine(at: endOfFunctionScope) != startOfLine(at: effectIndex) {
-                        let rangeToRemove = endOfLine(at: endOfFunctionScope) ..< effectIndex
-
-                        if tokens[rangeToRemove].allSatisfy(\.isSpaceOrLinebreak) {
-                            replaceTokens(in: rangeToRemove, with: [.space(" ")])
-                        }
-                    }
+                    cursorIndex += unwrapLine(before: effectsIndex, preservingComments: false)
                 }
             }
 
-            if let returnArrowIndex = index(of: .operator("->", .infix), after: endOfFunctionScope),
-               returnArrowIndex < openBracket
-            {
+            if let parsedReturn = parseFunctionDeclarationReturnClause(at: cursorIndex) {
+                let arrowIndex = parsedReturn.returnOperatorIndex
+                cursorIndex = parsedReturn.returnType.range.upperBound + 1
+
+                if shouldUnwrapReturnArrow {
+                    // this is part of the effects wrapping rule
+                    cursorIndex += unwrapLine(before: arrowIndex, preservingComments: false)
+                }
+
                 switch options.wrapReturnType {
-                case .preserve:
-                    break
+                case .preserve: break
                 case .ifMultiline:
                     // If the return arrow is on the same line as the closing paren, wrap it
-                    if startOfLine(at: endOfFunctionScope) == startOfLine(at: returnArrowIndex) {
-                        wrap(before: returnArrowIndex)
+                    guard closingParenLine == startOfLine(at: arrowIndex) else { break }
+                    cursorIndex += wrapLine(before: arrowIndex)
+                case .never:
+                    cursorIndex += unwrapLine(before: arrowIndex, preservingComments: true)
+
+                    // TODO: handle where clause
+                    if let nextIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: cursorIndex - 1),
+                       tokens[nextIndex] == .startOfScope("{")
+                    {
+                        unwrapLine(before: nextIndex, preservingComments: true)
                     }
                 }
             }
@@ -391,8 +383,7 @@ extension Formatter {
 
         func wrapArgumentsBeforeFirst(startOfScope i: Int,
                                       endOfScope: Int,
-                                      allowGrouping: Bool,
-                                      endOfScopeOnSameLine: Bool)
+                                      allowGrouping: Bool)
         {
             // Get indent
             let indent = currentIndentForLine(at: i)
@@ -402,14 +393,23 @@ extension Formatter {
                                           endOfScope: &endOfScope)
 
             let closingParenOnSameLine: Bool
-            switch options.callSiteClosingParenPosition {
-            case .balanced: closingParenOnSameLine = false
-            case .sameLine: closingParenOnSameLine = true
-            case .default: closingParenOnSameLine = options.closingParenPosition == .sameLine
+            if isFunctionCall(at: i) {
+                switch options.callSiteClosingParenPosition {
+                case .balanced: closingParenOnSameLine = false
+                case .sameLine: closingParenOnSameLine = true
+                case .default: closingParenOnSameLine = options.closingParenPosition == .sameLine
+                }
+            } else if tokens[i] == .startOfScope("(") {
+                switch options.closingParenPosition {
+                case .balanced: closingParenOnSameLine = false
+                case .sameLine: closingParenOnSameLine = true
+                case .default: closingParenOnSameLine = false
+                }
+            } else {
+                closingParenOnSameLine = false
             }
-            if closingParenOnSameLine, isFunctionCall(at: i) {
-                removeLinebreakBeforeEndOfScope(at: &endOfScope)
-            } else if endOfScopeOnSameLine {
+
+            if closingParenOnSameLine {
                 removeLinebreakBeforeEndOfScope(at: &endOfScope)
             } else {
                 // Insert linebreak before closing paren
@@ -449,8 +449,15 @@ extension Formatter {
                 index = commaIndex
             }
 
+            // If the closing paren is on the same line, and there's only a single item in the list,
+            // don't insert an opening paren (unless we're over the line width limit). This prevents
+            // issues with an open paren being wrapped unnecessarily and sitting on its own line in
+            // cases like long closure types in parens.
+            let insertLinebreakAfterOpeningParen = self.index(of: .delimiter(","), after: i) != nil
+                || lineLength(at: endOfLine(at: i)) > maxWidth
+
             // Insert linebreak and indent after opening paren
-            if let nextIndex = self.index(of: .nonSpaceOrComment, after: i) {
+            if insertLinebreakAfterOpeningParen, let nextIndex = self.index(of: .nonSpaceOrComment, after: i) {
                 if !tokens[nextIndex].isLinebreak {
                     insertLinebreak(at: nextIndex)
                     endOfScope += 1
@@ -549,7 +556,6 @@ extension Formatter {
             }
 
             let mode: WrapMode
-            var endOfScopeOnSameLine = false
             let hasMultipleArguments = index(of: .delimiter(","), in: i + 1 ..< endOfScope) != nil
             var isParameters = false
             switch string {
@@ -569,7 +575,6 @@ extension Formatter {
                     return
                 }
 
-                endOfScopeOnSameLine = options.closingParenPosition == .sameLine
                 isParameters = isParameterList(at: i)
                 if isParameters, options.wrapParameters != .default {
                     mode = options.wrapParameters
@@ -603,13 +608,11 @@ extension Formatter {
                 case .beforeFirst:
                     wrapArgumentsBeforeFirst(startOfScope: i,
                                              endOfScope: endOfScope,
-                                             allowGrouping: firstIdentifierIndex > firstLinebreakIndex,
-                                             endOfScopeOnSameLine: endOfScopeOnSameLine)
+                                             allowGrouping: firstIdentifierIndex > firstLinebreakIndex)
                 case .preserve where firstIdentifierIndex > firstLinebreakIndex:
                     wrapArgumentsBeforeFirst(startOfScope: i,
                                              endOfScope: endOfScope,
-                                             allowGrouping: true,
-                                             endOfScopeOnSameLine: endOfScopeOnSameLine)
+                                             allowGrouping: true)
                 case .afterFirst, .preserve:
                     wrapArgumentsAfterFirst(startOfScope: i,
                                             endOfScope: endOfScope,
@@ -664,8 +667,7 @@ extension Formatter {
                     case .preserve, .beforeFirst:
                         wrapArgumentsBeforeFirst(startOfScope: i,
                                                  endOfScope: endOfScope,
-                                                 allowGrouping: false,
-                                                 endOfScopeOnSameLine: endOfScopeOnSameLine)
+                                                 allowGrouping: false)
                     case .afterFirst:
                         wrapArgumentsAfterFirst(startOfScope: i,
                                                 endOfScope: endOfScope,
@@ -1371,7 +1373,7 @@ extension Formatter {
 
         while let conditionalBranchIndex = nextConditionalBranchIndex,
               conditionalBranchIndex == ifIndex || tokens[conditionalBranchIndex] == .keyword("else"),
-              let startOfBody = index(of: .startOfScope("{"), after: conditionalBranchIndex),
+              let startOfBody = startOfConditionalBranchBody(after: conditionalBranchIndex),
               let endOfBody = endOfScope(at: startOfBody)
         {
             branches.append((startOfBranch: startOfBody, endOfBranch: endOfBody))
@@ -1385,6 +1387,20 @@ extension Formatter {
         }
 
         return branches
+    }
+
+    /// Returns the `startOfScope("{")` token index for this conditional branch
+    func startOfConditionalBranchBody(after index: Int) -> Int? {
+        guard let startOfBody = self.index(of: .startOfScope("{"), after: index) else { return nil }
+
+        // If we find a closure, skip over it.
+        if isStartOfClosure(at: startOfBody),
+           let endOfClosure = endOfScope(at: startOfBody)
+        {
+            return startOfConditionalBranchBody(after: endOfClosure)
+        }
+
+        return startOfBody
     }
 
     /// Finds all of the branch bodies in a switch statement.
@@ -1682,6 +1698,76 @@ extension Formatter {
             return last(.keyword, before: startOfScopeIndex) == .keyword("func")
         }
     }
+
+    /// Whether or not the length of the type at the given index exceeds the minimum threshold to be organized
+    func typeLengthExceedsOrganizationThreshold(at typeKeywordIndex: Int) -> Bool {
+        let organizationThreshold: Int
+        switch tokens[typeKeywordIndex].string {
+        case "class", "actor":
+            organizationThreshold = options.organizeClassThreshold
+        case "struct":
+            organizationThreshold = options.organizeStructThreshold
+        case "enum":
+            organizationThreshold = options.organizeEnumThreshold
+        case "extension":
+            organizationThreshold = options.organizeExtensionThreshold
+        default:
+            organizationThreshold = 0
+        }
+
+        guard organizationThreshold != 0,
+              let startOfScope = index(of: .startOfScope("{"), after: typeKeywordIndex),
+              let endOfScope = endOfScope(at: startOfScope)
+        else {
+            return true
+        }
+
+        let lineCount = tokens[startOfScope ... endOfScope]
+            .filter(\.isLinebreak)
+            .count
+            - 1
+
+        return lineCount >= organizationThreshold
+    }
+
+    /// Removes any "test" prefix from the given method name
+    func removeTestPrefix(fromFunctionAt funcKeywordIndex: Int) {
+        // The name of a function always immediately follows the `func` keyword
+        guard let methodNameIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: funcKeywordIndex),
+              tokens[methodNameIndex].isIdentifier
+        else { return }
+
+        let methodName = tokens[methodNameIndex].string
+        guard methodName.hasPrefix("test"), methodName != "test" else { return }
+
+        var newMethodName = String(methodName.dropFirst("test".count))
+        newMethodName = newMethodName.first!.lowercased() + newMethodName.dropFirst()
+
+        // Handle methods like `test_feature()`, which should be updated to `feature()` rather than `_feature()`.
+        while newMethodName.hasPrefix("_") {
+            newMethodName = String(newMethodName.dropFirst())
+        }
+
+        updateFunctionName(forFunctionAt: funcKeywordIndex, to: newMethodName)
+    }
+
+    /// Updates the name of the given method / function, unless that change could cause a build failure.
+    func updateFunctionName(forFunctionAt funcKeywordIndex: Int, to newMethodName: String) {
+        // The name of a function always immediately follows the `func` keyword
+        guard let methodNameIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: funcKeywordIndex),
+              tokens[methodNameIndex].isIdentifier
+        else { return }
+
+        // Ensure that the new identifier is valid (e.g. starts with a letter, not a number),
+        // and is unique / doesn't already exist somewhere in the file.
+        guard !newMethodName.isEmpty,
+              newMethodName.first?.isLetter == true,
+              !tokens.contains(.identifier(newMethodName)),
+              !swiftKeywords.union(["Any", "Self", "self", "super", "nil", "true", "false"]).contains(newMethodName)
+        else { return }
+
+        replaceToken(at: methodNameIndex, with: .identifier(newMethodName))
+    }
 }
 
 extension Formatter {
@@ -1813,41 +1899,95 @@ extension Formatter {
 
     /// Parses generic types between the angle brackets of a function declaration, or in a where clause
     func parseGenericTypes(
+        from genericSignatureStartIndex: Int
+    ) -> (types: [GenericType], range: ClosedRange<Int>) {
+        var types = [GenericType]()
+        let range = parseGenericTypes(from: genericSignatureStartIndex, into: &types)
+        return (types, range)
+    }
+
+    /// Parses generic types between the angle brackets of a function declaration, or in a where clause
+    @discardableResult
+    func parseGenericTypes(
         from genericSignatureStartIndex: Int,
-        to genericSignatureEndIndex: Int,
         into genericTypes: inout [GenericType],
         qualifyGenericTypeName: (String) -> String = { $0 }
-    ) {
+    ) -> ClosedRange<Int> {
+        assert([.startOfScope("<"), .keyword("where")].contains(tokens[genericSignatureStartIndex]))
+
         var currentIndex = genericSignatureStartIndex
 
-        while currentIndex < genericSignatureEndIndex - 1 {
-            guard let genericTypeNameIndex = index(of: .identifier, after: currentIndex),
-                  genericTypeNameIndex < genericSignatureEndIndex
+        while currentIndex < tokens.count {
+            guard let lhsTypeIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: currentIndex),
+                  let lhsType = parseType(at: lhsTypeIndex)
             else { break }
 
-            let typeEndIndex: Int
-            let nextCommaIndex = index(of: .delimiter(","), after: genericTypeNameIndex)
-            if let nextCommaIndex = nextCommaIndex, nextCommaIndex < genericSignatureEndIndex {
-                typeEndIndex = nextCommaIndex
-            } else {
-                typeEndIndex = genericSignatureEndIndex - 1
+            currentIndex = lhsType.range.upperBound
+
+            // Parse the constraint after the type name if present
+            var conformanceType: GenericType.GenericConformance.ConformanceType?
+
+            // This can either be a protocol constraint of the form `T: Fooable`
+            if let colonIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: currentIndex),
+               tokens[colonIndex] == .delimiter(":")
+            {
+                conformanceType = .protocolConstraint
+                currentIndex = colonIndex
             }
 
-            // Include all whitespace and comments in the conformance's source range,
-            // so if we remove it later all of the extra whitespace will get cleaned up
-            let sourceRangeEnd: Int
-            if let nextTokenIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: typeEndIndex) {
-                sourceRangeEnd = nextTokenIndex - 1
+            // or a concrete type of the form `T == Foo`
+            else if let equalsIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: currentIndex),
+                    tokens[equalsIndex].isOperator,
+                    tokens[equalsIndex].string == "=="
+            {
+                conformanceType = .concreteType
+                currentIndex = equalsIndex
+            }
+
+            var rhsType: (name: String, range: ClosedRange<Int>)?
+            if let rhsTypeIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: currentIndex),
+               let type = parseType(at: rhsTypeIndex)
+            {
+                rhsType = type
+                currentIndex = type.range.upperBound
+            }
+
+            // The generic clause can continue with a comma.
+            let hasMoreElements: Bool
+            if let commaIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: currentIndex),
+               tokens[commaIndex] == .delimiter(",")
+            {
+                currentIndex = commaIndex
+                hasMoreElements = true
+
+                // Include any trailing spaces, comments, or newlines with this type.
+                if let nextToken = index(of: .nonSpaceOrCommentOrLinebreak, after: currentIndex) {
+                    currentIndex = nextToken - 1
+                }
             } else {
-                sourceRangeEnd = typeEndIndex
+                // Otherwise this is the last element in the list.
+                hasMoreElements = false
+
+                // Include any trailing spaces or comments with this type.
+                // Don't include any newlines, since in the case of a protocol definition
+                // this could be the last time in the entire declaration.
+                if let nextToken = index(of: .nonSpaceOrComment, after: currentIndex) {
+                    currentIndex = nextToken - 1
+                }
             }
 
             // The generic constraint could have syntax like `Foo`, `Foo: Fooable`,
             // `Foo.Element == Fooable`, etc. Create a reference to this specific
             // generic parameter (`Foo` in all of these examples) that can store
             // the constraints and conformances that we encounter later.
-            let fullGenericTypeName = qualifyGenericTypeName(tokens[genericTypeNameIndex].string)
-            let baseGenericTypeName = fullGenericTypeName.components(separatedBy: ".")[0]
+            let fullGenericTypeName = qualifyGenericTypeName(lhsType.name)
+
+            let baseGenericTypeName: String
+            if fullGenericTypeName.contains(".") {
+                baseGenericTypeName = fullGenericTypeName.components(separatedBy: ".")[0]
+            } else {
+                baseGenericTypeName = fullGenericTypeName
+            }
 
             let genericType: GenericType
             if let existingType = genericTypes.first(where: { $0.name == baseGenericTypeName }) {
@@ -1855,51 +1995,32 @@ extension Formatter {
             } else {
                 genericType = GenericType(
                     name: baseGenericTypeName,
-                    definitionSourceRange: genericTypeNameIndex ... sourceRangeEnd
+                    definitionSourceRange: lhsType.range.lowerBound ... currentIndex
                 )
                 genericTypes.append(genericType)
             }
 
-            // Parse the constraint after the type name if present
-            var delineatorIndex: Int?
-            var conformanceType: GenericType.GenericConformance.ConformanceType?
-
-            // This can either be a protocol constraint of the form `T: Fooable`
-            if let colonIndex = index(of: .delimiter(":"), after: genericTypeNameIndex),
-               colonIndex < typeEndIndex
-            {
-                delineatorIndex = colonIndex
-                conformanceType = .protocolConstraint
-            }
-
-            // or a concrete type of the form `T == Foo`
-            else if let equalsIndex = index(after: genericTypeNameIndex, where: { $0.isOperator("==") }),
-                    equalsIndex < typeEndIndex
-            {
-                delineatorIndex = equalsIndex
-                conformanceType = .concreteType
-            }
-
-            if let delineatorIndex = delineatorIndex, let conformanceType = conformanceType {
-                let constrainedTypeName = tokens[genericTypeNameIndex ..< delineatorIndex]
-                    .map(\.string)
-                    .joined()
-                    .trimmingCharacters(in: .init(charactersIn: " \n\r,{}"))
-
-                let conformanceName = tokens[(delineatorIndex + 1) ... typeEndIndex]
-                    .map(\.string)
-                    .joined()
-                    .trimmingCharacters(in: .init(charactersIn: " \n\r,{}"))
-
+            if let rhsType, let conformanceType {
                 genericType.conformances.append(.init(
-                    name: conformanceName,
-                    typeName: qualifyGenericTypeName(constrainedTypeName),
+                    name: rhsType.name,
+                    typeName: qualifyGenericTypeName(lhsType.name),
                     type: conformanceType,
-                    sourceRange: genericTypeNameIndex ... sourceRangeEnd
+                    sourceRange: lhsType.range.lowerBound ... currentIndex
                 ))
             }
 
-            currentIndex = typeEndIndex
+            if !hasMoreElements {
+                break
+            }
+        }
+
+        if tokens[genericSignatureStartIndex] == .startOfScope("<"), let endOfScope = endOfScope(at: genericSignatureStartIndex) {
+            return genericSignatureStartIndex ... endOfScope
+        }
+
+        else {
+            // where clauses don't have an explicit end token, so end at the last index of the final element
+            return genericSignatureStartIndex ... currentIndex
         }
     }
 
@@ -2164,7 +2285,6 @@ extension Formatter {
                         }
                         lastKeyword = ""
                     case "if", "while", "guard", "for":
-                        assert(!isTypeRoot)
                         // Guard is included because it's an error to reference guard vars in body
                         var scopedNames = localNames
                         let removeSelf = explicitSelf != .insert && !usingDynamicLookup && (
@@ -2302,7 +2422,7 @@ extension Formatter {
                     continue
                 case .startOfScope("{") where lastKeyword == "var":
                     lastKeyword = ""
-                    if isStartOfClosure(at: index, in: scopeStack.last?.token) {
+                    if isStartOfClosure(at: index) {
                         fallthrough
                     }
                     var prevIndex = index - 1
@@ -2535,7 +2655,7 @@ extension Formatter {
                         switch prevToken {
                         case .identifier, .number, .endOfScope,
                              .operator where ![
-                                 .operator("=", .infix), .operator(".", .prefix)
+                                 .operator("=", .infix), .operator(".", .prefix),
                              ].contains(prevToken):
                             isAssignment = false
                             lastKeyword = ""
@@ -2721,7 +2841,8 @@ extension Formatter {
                 case .keyword("throws"),
                      .keyword("rethrows"),
                      .keyword("where"),
-                     .keyword("is"):
+                     .keyword("is"),
+                     .keyword("repeat"):
                     return false // Keep looking
                 case .keyword where !$0.isAttribute:
                     return true // Not valid between end of arguments and start of body

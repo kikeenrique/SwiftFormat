@@ -22,6 +22,7 @@
 * [enumNamespaces](#enumNamespaces)
 * [extensionAccessControl](#extensionAccessControl)
 * [fileHeader](#fileHeader)
+* [fileMacro](#fileMacro)
 * [genericExtensions](#genericExtensions)
 * [headerFileName](#headerFileName)
 * [hoistAwait](#hoistAwait)
@@ -35,6 +36,7 @@
 * [modifierOrder](#modifierOrder)
 * [numberFormatting](#numberFormatting)
 * [opaqueGenericParameters](#opaqueGenericParameters)
+* [preferCountWhere](#preferCountWhere)
 * [preferForLoop](#preferForLoop)
 * [preferKeyPath](#preferKeyPath)
 * [redundantBackticks](#redundantBackticks)
@@ -77,6 +79,7 @@
 * [spaceInsideParens](#spaceInsideParens)
 * [strongOutlets](#strongOutlets)
 * [strongifiedSelf](#strongifiedSelf)
+* [swiftTestingTestCaseNames](#swiftTestingTestCaseNames)
 * [todos](#todos)
 * [trailingClosures](#trailingClosures)
 * [trailingCommas](#trailingCommas)
@@ -96,20 +99,27 @@
 
 * [acronyms](#acronyms)
 * [blankLineAfterSwitchCase](#blankLineAfterSwitchCase)
+* [blankLinesAfterGuardStatements](#blankLinesAfterGuardStatements)
 * [blankLinesBetweenImports](#blankLinesBetweenImports)
 * [blockComments](#blockComments)
 * [docComments](#docComments)
+* [emptyExtensions](#emptyExtensions)
+* [environmentEntry](#environmentEntry)
 * [isEmpty](#isEmpty)
 * [markTypes](#markTypes)
 * [noExplicitOwnership](#noExplicitOwnership)
 * [organizeDeclarations](#organizeDeclarations)
+* [preferSwiftTesting](#preferSwiftTesting)
+* [privateStateVariables](#privateStateVariables)
 * [propertyTypes](#propertyTypes)
+* [redundantEquatable](#redundantEquatable)
 * [redundantProperty](#redundantProperty)
 * [sortSwitchCases](#sortSwitchCases)
 * [unusedPrivateDeclarations](#unusedPrivateDeclarations)
 * [wrapConditionalBodies](#wrapConditionalBodies)
 * [wrapEnumCases](#wrapEnumCases)
 * [wrapMultilineConditionalAssignment](#wrapMultilineConditionalAssignment)
+* [wrapMultilineFunctionChains](#wrapMultilineFunctionChains)
 * [wrapSwitchCases](#wrapSwitchCases)
 
 # Deprecated Rules (do not use)
@@ -127,6 +137,7 @@ Capitalize acronyms when the first character is capitalized.
 Option | Description
 --- | ---
 `--acronyms` | Acronyms to auto-capitalize. Defaults to "ID,URL,UUID"
+`--preserveacronyms` | List of symbols to be ignored by the acyronyms rule
 
 <details>
 <summary>Examples</summary>
@@ -285,6 +296,28 @@ which is followed by a closing brace).
           energyShields.engage()
       }
   }
+```
+
+</details>
+<br/>
+
+## blankLinesAfterGuardStatements
+
+Remove blank lines between consecutive guard statements, and insert a blank after the last guard statement.
+
+<details>
+<summary>Examples</summary>
+
+```diff
+    guard let spicy = self.makeSpicy() else {
+        return
+    }
+-
+    guard let soap = self.clean() else {
+        return
+    }
++
+    let doTheJob = nikekov()
 ```
 
 </details>
@@ -831,6 +864,22 @@ Option | Description
 </details>
 <br/>
 
+## emptyExtensions
+
+Remove empty, non-conforming, extensions.
+
+<details>
+<summary>Examples</summary>
+
+```diff
+- extension String {}
+-
+  extension String: Equatable {}
+```
+
+</details>
+<br/>
+
 ## enumNamespaces
 
 Convert types used for hosting only static members into enums (an empty enum is
@@ -849,6 +898,32 @@ Option | Description
       static let foo = "foo"
       static let bar = "bar"
   }
+```
+
+</details>
+<br/>
+
+## environmentEntry
+
+Updates SwiftUI `EnvironmentValues` definitions to use the @Entry macro.
+
+<details>
+<summary>Examples</summary>
+
+```diff
+- struct ScreenNameEnvironmentKey: EnvironmentKey {
+-   static var defaultValue: Identifier? {
+-      .init("undefined") 
+-     }
+-   }
+
+   extension EnvironmentValues {
+-    var screenName: Identifier? {
+-      get { self[ScreenNameEnvironmentKey.self] }
+-      set { self[ScreenNameEnvironmentKey.self] = newValue }
+-    }
++    @Entry var screenName: Identifier? = .init("undefined")
+   }
 ```
 
 </details>
@@ -994,6 +1069,30 @@ standard library.
 ```diff
 - // Created 2023-08-10 11:00 GMT
 + // Created 2023-08-10 23:00 GMT+12:00
+```
+
+</details>
+<br/>
+
+## fileMacro
+
+Prefer either #file or #fileID, which have the same behavior in Swift 6 and later.
+
+Option | Description
+--- | ---
+`--filemacro` | File macro to prefer: "#file" (default) or "#fileID".
+
+<details>
+<summary>Examples</summary>
+
+```diff
+// --filemacro #file
+- func foo(file: StaticString = #fileID) { ... }
++ func foo(file: StaticString = #file) { ... }
+
+// --filemacro #fileID
+- func foo(file: StaticString = #file) { ... }
++ func foo(file: StaticString = #fileID) { ... }
 ```
 
 </details>
@@ -1467,6 +1566,7 @@ Option | Description
 `--visibilitymarks` | Marks for visibility groups (public:Public Fields,..)
 `--typemarks` | Marks for declaration type groups (classMethod:Baaz,..)
 `--groupblanklines` | Require a blank line after each subgroup. Default: true
+`--sortswiftuiprops` | Sort SwiftUI props: none, alphabetize, first-appearance-sort
 
 <details>
 <summary>Examples</summary>
@@ -1583,6 +1683,32 @@ Without this declaration, only functions will be reordered, while properties wil
 </details>
 <br/>
 
+## preferCountWhere
+
+Prefer `count(where:)` over `filter(_:).count`.
+
+<details>
+<summary>Examples</summary>
+
+```diff
+- planets.filter { !$0.moons.isEmpty }.count
++ planets.count(where: { !$0.moons.isEmpty })
+
+- planets.filter { planet in
+-     planet.moons.filter { moon in
+-         moon.hasAtmosphere
+-     }.count > 1
+- }.count
++ planets.count(where: { planet in
++     planet.moons.count(where: { moon in
++         moon.hasAtmosphere
++     }) > 1
++ })
+```
+
+</details>
+<br/>
+
 ## preferForLoop
 
 Convert functional `forEach` calls to for loops.
@@ -1638,6 +1764,101 @@ Convert trivial `map { $0.foo }` closures to keyPath-based syntax.
 
 - let barArray = fooArray.compactMap { $0.optionalBar }
 + let barArray = fooArray.compactMap(\.optionalBar)
+```
+
+</details>
+<br/>
+
+## preferSwiftTesting
+
+Prefer the Swift Testing library over XCTest.
+
+Option | Description
+--- | ---
+`--xctestsymbols` | Comma-delimited list of symbols that depend on XCTest
+
+<details>
+<summary>Examples</summary>
+
+```diff
+  @testable import MyFeatureLib
+- import XCTest
++ import Testing
++ import Foundation
+
+- final class MyFeatureTests: XCTestCase {
+-     func testMyFeatureHasNoBugs() {
+-         let myFeature = MyFeature()
+-         myFeature.runAction()
+-         XCTAssertFalse(myFeature.hasBugs, "My feature has no bugs")
+-         XCTAssertEqual(myFeature.crashes.count, 0, "My feature doesn't crash")
+-         XCTAssertNil(myFeature.crashReport)
+-     }
+- }
++ @MainActor @Suite(.serialized)
++ final class MyFeatureTests { 
++     @Test func myFeatureHasNoBugs() {
++         let myFeature = MyFeature()
++         myFeature.runAction()
++         #expect(!myFeature.hasBugs, "My feature has no bugs")
++         #expect(myFeature.crashes.isEmpty, "My feature doesn't crash")
++         #expect(myFeature.crashReport == nil)
++     }
++ }
+
+- final class MyFeatureTests: XCTestCase {
+-     var myFeature: MyFeature!
+- 
+-     override func setUp() async throws {
+-         myFeature = try await MyFeature()
+-     }
+- 
+-     override func tearDown() {
+-         myFeature = nil
+-     }
+- 
+-     func testMyFeatureWorks() {
+-         myFeature.runAction()
+-         XCTAssertTrue(myFeature.worksProperly)
+-         XCTAssertEqual(myFeature.screens.count, 8)
+-     }
+- }
++ @MainActor
++ final class MyFeatureTests {
++     var myFeature: MyFeature!
++ 
++     init() async throws {
++         myFeature = try await MyFeature()
++     }
++ 
++     deinit {
++         myFeature = nil
++     }
++ 
++     @Test func myFeatureWorks() {
++         myFeature.runAction()
++         #expect(myFeature.worksProperly)
++         #expect(myFeature.screens.count == 8)
++     }
++ }
+```
+
+</details>
+<br/>
+
+## privateStateVariables
+
+Adds `private` access control to @State properties without existing access control modifiers.
+
+<details>
+<summary>Examples</summary>
+
+```diff
+- @State var anInt: Int
++ @State private var anInt: Int
+
+- @StateObject var myInstance: MyObject
++ @StateObject private var myInstace: MyObject
 ```
 
 </details>
@@ -1857,6 +2078,61 @@ which are called immediately.
 - }()
 + lazy var bar = Bar(baaz: baaz,
 +                    quux: quux)
+```
+
+</details>
+<br/>
+
+## redundantEquatable
+
+Omit a hand-written Equatable implementation when the compiler-synthesized conformance would be equivalent.
+
+Option | Description
+--- | ---
+`--equatablemacro` | For example: "@Equatable,EquatableMacroLib"
+
+<details>
+<summary>Examples</summary>
+
+```diff
+  struct Foo: Equatable {
+      let bar: Bar
+      let baaz: Baaz
+
+-     static func ==(lhs: Foo, rhs: Foo) -> Bool {
+-         lhs.bar == rhs.bar 
+-             && lhs.baaz == rhs.baaz
+-     }
+  }
+
+  class Bar: Equatable {
+      let baaz: Baaz
+
+      static func ==(lhs: Bar, rhs: Bar) -> Bool {
+          lhs.baaz == rhs.baaz
+      }
+  }
+```
+
+If your project includes a macro that generates the `static func ==` implementation
+for the attached class, you can specify `--equatablemacro @Equatable,MyMacroLib`
+and this rule will also migrate eligible classes to use your macro instead of
+a hand-written Equatable conformance:
+
+```diff
+  // --equatablemacro @Equatable,MyMacroLib
+  import FooLib
++ import MyMacroLib
+
++ @Equatable
++ class Bar {
+- class Bar: Equatable {
+      let baaz: Baaz
+
+-     static func ==(lhs: Bar, rhs: Bar) -> Bool {
+-         lhs.baaz == rhs.baaz
+-     }
+  }
 ```
 
 </details>
@@ -2832,6 +3108,31 @@ set to 4.2 or above.
 </details>
 <br/>
 
+## swiftTestingTestCaseNames
+
+In Swift Testing, don't prefix @Test methods with 'test'.
+
+<details>
+<summary>Examples</summary>
+
+```diff
+  import Testing
+
+  struct MyFeatureTests {
+-     @Test func testMyFeatureHasNoBugs() {
++     @Test func myFeatureHasNoBugs() {
+          let myFeature = MyFeature()
+          myFeature.runAction()
+          #expect(!myFeature.hasBugs, "My feature has no bugs")
+          #expect(myFeature.crashes.isEmpty, "My feature doesn't crash")
+          #expect(myFeature.crashReport == nil)
+      }
+  }
+```
+
+</details>
+<br/>
+
 ## todos
 
 Use correct formatting for `TODO:`, `MARK:` or `FIXME:` comments.
@@ -2879,7 +3180,7 @@ Option | Description
 
 ## trailingCommas
 
-Add or remove trailing comma from the last item in a collection literal.
+Add or remove trailing commas in comma-separated lists.
 
 Option | Description
 --- | ---
@@ -2893,13 +3194,35 @@ Option | Description
     foo,
     bar,
 -   baz
-  ]
-
-  let array = [
-    foo,
-    bar,
 +   baz,
   ]
+```
+
+Swift 6.1 and later:
+
+```diff
+  func foo(
+      bar: Int,
+-     baaz: Int
++     baaz: Int,
+  ) {}
+```
+
+```diff
+  foo(
+      bar: 1,
+-     baaz: 2
++     baaz: 2,
+  )
+```
+
+```diff
+  struct Foo<
+      Bar,
+      Baaz,
+-     Quux
++     Quux,
+  > {}
 ```
 
 </details>
@@ -3086,7 +3409,7 @@ Option | Description
 `--wrapcollections` | Wrap array/dict: "before-first", "after-first", "preserve"
 `--closingparen` | Closing paren position: "balanced" (default) or "same-line"
 `--callsiteparen` | Closing paren at call sites: "balanced" or "same-line"
-`--wrapreturntype` | Wrap return type: "if-multiline", "preserve" (default)
+`--wrapreturntype` | Wrap return type: "if-multiline", "preserve", "never"
 `--wrapconditions` | Wrap conditions: "before-first", "after-first", "preserve"
 `--wraptypealiases` | Wrap typealiases: "before-first", "after-first", "preserve"
 `--wrapeffects` | Wrap effects: "if-multiline", "never", "preserve"
@@ -3300,6 +3623,27 @@ Wrap multiline conditional assignment expressions after the assignment operator.
 +     } else {
 +         "Rogue planet"
 +     }
+```
+
+</details>
+<br/>
+
+## wrapMultilineFunctionChains
+
+Wraps chained function calls to either all on the same line, or one per line.
+
+<details>
+<summary>Examples</summary>
+
+```diff
+  let evenSquaresSum = [20, 17, 35, 4]
+-   .filter { $0 % 2 == 0 }.map { $0 * $0 }
+    .reduce(0, +)
+
+  let evenSquaresSum = [20, 17, 35, 4]
++   .filter { $0 % 2 == 0 }
++   .map { $0 * $0 }
+    .reduce(0, +)
 ```
 
 </details>

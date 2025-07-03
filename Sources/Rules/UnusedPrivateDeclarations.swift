@@ -26,7 +26,7 @@ public extension FormatRule {
 
         // Collect all of the `private` or `fileprivate` declarations in the file
         var privateDeclarations: [Declaration] = []
-        formatter.forEachRecursiveDeclaration { declaration in
+        formatter.parseDeclarations().forEachRecursiveDeclaration { declaration in
             let declarationModifiers = Set(declaration.modifiers)
             let hasDisallowedModifiers = disallowedModifiers.contains(where: { declarationModifiers.contains($0) })
 
@@ -53,14 +53,14 @@ public extension FormatRule {
 
         // Remove any private or fileprivate declaration whose name only
         // appears a single time in the source file
-        for declaration in privateDeclarations.reversed() {
+        for declaration in privateDeclarations {
             // Strip backticks from name for a normalized base name for cases like `default`
             guard let name = declaration.name?.trimmingCharacters(in: CharacterSet(charactersIn: "`")) else { continue }
             // Check for regular usage, common property wrapper prefixes, and protected names
             let variants = [name, "_\(name)", "$\(name)", "`\(name)`"]
             let count = variants.compactMap { usage[$0] }.reduce(0, +)
             if count <= 1 {
-                formatter.removeTokens(in: declaration.originalRange)
+                declaration.remove()
             }
         }
     } examples: {

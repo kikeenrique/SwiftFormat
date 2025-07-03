@@ -75,4 +75,19 @@ class AcronymsTests: XCTestCase {
 
         testFormatting(for: input, rule: .acronyms)
     }
+
+    func testRespectsPreserveSymbols() {
+        let input = """
+        let destinationUrl = api.externallyProvidedUrl
+        api.route(toUrl: destinationUrl)
+        """
+
+        let output = """
+        let destinationURL = api.externallyProvidedUrl
+        api.route(toUrl: destinationURL)
+        """
+
+        let options = FormatOptions(preserveAcronyms: ["externallyProvidedUrl", "toUrl"])
+        testFormatting(for: input, output, rule: .acronyms, options: options)
+    }
 }

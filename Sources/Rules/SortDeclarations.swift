@@ -16,7 +16,7 @@ public extension FormatRule {
         // swiftformat:sort:end comments.
         """,
         options: ["sortedpatterns"],
-        sharedOptions: ["organizetypes"]
+        sharedOptions: ["linebreaks", "organizetypes", "structthreshold", "classthreshold", "enumthreshold", "extensionlength"]
     ) { formatter in
         formatter.forEachToken(
             where: {
@@ -24,7 +24,6 @@ public extension FormatRule {
                     || $0.isDeclarationTypeKeyword(including: Array(Token.swiftTypeKeywords))
             }
         ) { index, token in
-
             let rangeToSort: ClosedRange<Int>
             let numberOfLeadingLinebreaks: Int
 
@@ -57,15 +56,16 @@ public extension FormatRule {
                       let typeCloseBrace = formatter.endOfScope(at: typeOpenBrace),
                       let firstTypeBodyToken = formatter.index(of: .nonLinebreak, after: typeOpenBrace),
                       let lastTypeBodyToken = formatter.index(of: .nonLinebreak, before: typeCloseBrace),
-                      let declarationKeyword = formatter.lastSignificantKeyword(at: typeOpenBrace),
+                      let declarationKeywordIndex = formatter.indexOfLastSignificantKeyword(at: typeOpenBrace),
                       lastTypeBodyToken > typeOpenBrace
                 else { return }
 
                 // Sorting the body of a type conflicts with the `organizeDeclarations`
-                // keyword if enabled for this type of declaration. In that case,
+                // keyword if enabled for this declaration. In that case,
                 // defer to the sorting implementation in `organizeDeclarations`.
                 if formatter.options.enabledRules.contains(FormatRule.organizeDeclarations.name),
-                   formatter.options.organizeTypes.contains(declarationKeyword)
+                   formatter.options.organizeTypes.contains(formatter.tokens[declarationKeywordIndex].string),
+                   formatter.typeLengthExceedsOrganizationThreshold(at: declarationKeywordIndex)
                 {
                     return
                 }
@@ -109,11 +109,8 @@ public extension FormatRule {
                 if declaration.tokens.last?.isLinebreak == false,
                    nextDeclaration.tokens.first?.isLinebreak == false
                 {
-                    declarations[i + 1] = nextDeclaration.mapOpeningTokens { openTokens in
-                        let openFormatter = Formatter(openTokens)
-                        openFormatter.insertLinebreak(at: 0)
-                        return openFormatter.tokens
-                    }
+                    let declarationNeedingLinebreak = declarations[i + 1]
+                    declarationNeedingLinebreak.formatter.insertLinebreak(at: declarationNeedingLinebreak.range.lowerBound)
                 }
             }
 

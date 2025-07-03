@@ -48,18 +48,31 @@ public extension FormatRule {
 
             if useInferredType {
                 guard let type = property.type else { return }
-                let typeTokens = formatter.tokens[type.range]
+                let typeTokens = Array(formatter.tokens[type.range])
+
+                // If the type is wrapped in redundant parens, retrieve the inner type value
+                // before we check for types like `any Type` or `Type?`.
+                var typeTokensWithoutParens = typeTokens
+                while typeTokensWithoutParens.first == .startOfScope("("),
+                      typeTokensWithoutParens.last == .endOfScope(")"),
+                      !typeTokensWithoutParens.string.isTupleType
+                {
+                    typeTokensWithoutParens = Array(typeTokensWithoutParens.dropFirst().dropLast())
+                }
 
                 // Preserve the existing formatting if the LHS type is optional.
                 //  - `let foo: Foo? = .foo` is valid, but `let foo = Foo?.foo`
                 //    is invalid if `.foo` is defined on `Foo` but not `Foo?`.
-                guard typeTokens.last?.isUnwrapOperator != true else { return }
+                guard typeTokensWithoutParens.last?.isUnwrapOperator != true else { return }
 
-                // Preserve the existing formatting if the LHS type is an existential (indicated with `any`).
+                // Preserve the existing formatting if the LHS type is an existential (indicated with `any`)
+                // or opaque type (indicated with `some`).
                 //  - The `extension MyProtocol where Self == MyType { ... }` syntax
                 //    creates static members where `let foo: any MyProtocol = .myType`
                 //    is valid, but `let foo = (any MyProtocol).myType` isn't.
-                guard typeTokens.first?.string != "any" else { return }
+                guard typeTokensWithoutParens.first?.string != "any",
+                      typeTokensWithoutParens.first?.string != "some"
+                else { return }
 
                 // Preserve the existing formatting if the RHS expression has a top-level infix operator.
                 //  - `let value: ClosedRange<Int> = .zero ... 10` would not be valid to convert to

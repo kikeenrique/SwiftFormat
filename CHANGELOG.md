@@ -1,5 +1,62 @@
 # Change Log
 
+## [0.56.4](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.56.4) (2025-06-15)
+
+- Fixed issue where `trailingCommas` rule would not insert trailing commas in function declarations with return type
+- Fixed issue where `trailingCommas` rule would not insert trailing commas in array literals following `!` operator
+- Fixed issue where `unusedArguments` rule would ignore function declarations with trailing commas
+- Fixed issue where `void` rule would not handle `()` types in typealiases
+- Fixed issue where `redundantLet` rule did not detect code inside result builders when nested in conditional compilation blocks
+
+## [0.56.3](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.56.3) (2025-06-04)
+
+- Fixed issue where `trailingCommas` rule would insert commas in closure types and tuple types used in typealaises (not supported in Swift 6.1)
+
+## [0.56.2](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.56.2) (2025-05-27)
+
+- Fixed issues where `trailingCommas` rule would insert commas in `@escpaing` or `@Sendable` closure types (not supported in Swift 6.1)
+- Fixed issue where `privateStateVariables` rule handled `@Previewable` attributes on previous line incorrectly
+
+## [0.56.1](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.56.1) (2025-05-13)
+
+- Fixed several issues where `trailingCommas` rule would insert commas in places not actually supported by Swift 6.1
+- Fixed issue where `--wrapeffects` option would incorrectly unwrap `async let` properties following function call
+- Fixed issue where `redundantEquatable` rule would incorrectly remove `==` implementation in factor of synthesized implementation even if type contained non-Equatable properies like tuples
+- Fixed issue where `extensionAccessControl` rule would incorrectly hoist `public` ACL in `@preconcurrency` conformances
+- Fixed issue where `organizeDeclarations` rule would sometimes break property declarations with if expression values
+
+## [0.56.0](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.56.0) (2025-05-12)
+
+- Added `wrapMultilineFunctionChains` rule to wrap chained method calls
+- Added `environmentEntry` rule to update SwiftUI `EnvironmentValues` definitions to use the `@Entry` macro
+- Added `redundantEquatable` rule to remove explicit `Equatable` conformances that would be compiler-synthesized
+- Added `preferSwiftTesting` rule to migrate XCTest-based tests to Swift Testing
+- Added `swiftTestingTestCaseNames` rule to remove redundant "test" prefix from Swift Testing test case methods.
+- Added `preferCountWhere` rule to prefer `count(where:)` over `filter(_:).count`
+- Added `fileMacro` rule to prefer either `#file` or `#fileID`, which have the same behavior in Swift 6 and later
+- Added `blankLinesAfterGuardStatements` rule to remove blank lines between consecuitve guard statements, and add blank line after last guard statement.
+- Added `privateStateVariables` rule to add `private` access control to `@State` properties
+- Added `emptyExtensions` rule to remove extensions that contain no declarations or conformances
+- Added `--preserveacronyms` option to `acronyms` rule
+- Added `--wrapreturntype never` option to `wrapArguments` rule
+- Updated `trailingCommas` to support Swift 6.1 trailing comma functionality
+- `opaqueGenericParameters` now supports protocol requirements without a body
+- `--wrapeffects` and `--wrapreturntype` now support protocol requirements and closure types
+- Fixed indentation of trailing closures after chained multiline method call when using same-line closing parens
+- `blankLinesAtStartOfScope` rule now supports switch cases and closure capture / parameter lists
+- Fixed issue where type under `organizeDeclarations` line count threshold would ignore `swiftformat:sort` directives
+- Fixed issue where `organizeDeclarations` rule would unexpectedly remove non-mark comments
+- Compiling SwiftFormat now requires Swift 5.7+
+- SwiftFormat prerelease builds can now be installed via Homebrew using `brew install swiftformat --head`. Prerelease builds are subject to breaking changes.
+
+## [0.55.6](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.55.6) (2025-04-29)
+
+- Fixed parsing bugs related to parameter packs (`repeat`, `each` keywords)
+- Fixed bug where `propertyTypes` rule could cause build failure in properties with `some` type
+- Fixed bug where `--callsiteparen balanced` would have no effect when using `--closingparen same-line`
+- Fatal error messages now include the name of the currently-running rule
+- Docker build now uses Swift 6.0.3
+
 ## [0.55.5](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.55.5) (2025-01-20)
 
 - Fixed bug with `yodaConditions` rule mangling generic function calls

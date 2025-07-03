@@ -78,8 +78,8 @@ class CodeOrganizationTests: XCTestCase {
                     guard let helperName = bodyDeclaration.name else { continue }
 
                     var helperFuncArgLabels: [String?]? = nil
-                    if bodyDeclaration.keyword == "func", let startOfScope = formatter.index(of: .startOfScope("("), after: bodyDeclaration.originalRange.lowerBound) {
-                        helperFuncArgLabels = formatter.parseFunctionDeclarationArgumentLabels(startOfScope: startOfScope)
+                    if bodyDeclaration.keyword == "func", let startOfScope = formatter.index(of: .startOfScope("("), after: bodyDeclaration.range.lowerBound) {
+                        helperFuncArgLabels = formatter.parseFunctionDeclarationArguments(startOfScope: startOfScope).map(\.externalLabel)
                     }
 
                     allRuleFileHelpers.append((name: helperName, fileName: fileName, funcArgLabels: helperFuncArgLabels))
@@ -104,7 +104,7 @@ class CodeOrganizationTests: XCTestCase {
                 // between methods with the same base name
                 var functionCallArguments: [String?]?
                 if let functionCallStartOfScope = formatter.index(of: .startOfScope("("), after: index) {
-                    functionCallArguments = formatter.parseFunctionCallArgumentLabels(startOfScope: functionCallStartOfScope)
+                    functionCallArguments = formatter.parseFunctionCallArguments(startOfScope: functionCallStartOfScope).map(\.label)
                 }
 
                 guard let matchingHelper = allRuleFileHelpers.first(where: { helper in
@@ -163,8 +163,10 @@ class CodeOrganizationTests: XCTestCase {
             let formatter = Formatter(tokenize(content))
             let declarations = formatter.parseDeclarations()
 
-            guard let testClass = declarations.first(where: {
-                $0.openTokens.string.contains("XCTestCase") && $0.keyword == "class"
+            guard let testClass = declarations.first(where: { declaration in
+                let rangeBeforeKeyword = declaration.range.lowerBound ..< declaration.keywordIndex
+                return declaration.keyword == "class"
+                    && formatter.tokens[rangeBeforeKeyword].contains(.identifier("XCTestCase"))
             }) else { continue }
 
             let expectedTestClassName = testFileName.replacingOccurrences(of: ".swift", with: "")

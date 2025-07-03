@@ -112,21 +112,25 @@ public enum ExtensionACLPlacement: String, CaseIterable {
 
 /// Wrapping behavior for the return type of a function declaration
 public enum WrapReturnType: String, CaseIterable {
-    case ifMultiline = "if-multiline"
     case preserve
+    /// `-> ReturnType` is wrapped to the line after the closing paren
+    /// if the function signature spans multiple lines
+    case ifMultiline = "if-multiline"
+    /// `-> ReturnType` is never wrapped, and always include on the same line as the closing paren
+    case never
 }
 
 /// Wrapping behavior for effects (`async`, `throws`)
 public enum WrapEffects: String, CaseIterable {
     case preserve
     /// `async` and `throws` are wrapped to the line after the closing paren
-    /// if the function spans multiple lines
+    /// if the function signature spans multiple lines
     case ifMultiline = "if-multiline"
     /// `async` and `throws` are never wrapped, and are always included on the same line as the closing paren
     case never
 }
 
-/// Argument type for whether explciti or inferred properties are preferred
+/// Argument type for whether explicit or inferred properties are preferred
 public enum PropertyTypes: String, CaseIterable {
     /// Preserves the type as a part of the property definition:
     /// `let foo: Foo = Foo()` becomes `let foo: Foo = .init()`
@@ -581,6 +585,46 @@ public enum ClosingParenPosition: String, CaseIterable {
     case `default`
 }
 
+public enum SwiftUIPropertiesSortMode: String, CaseIterable {
+    /// No sorting
+    case none
+    /// Sort alphabetically
+    case alphabetize
+    /// Group all properties of the same type in order of the first time each property appears
+    case firstAppearanceSort = "first-appearance-sort"
+}
+
+public enum EquatableMacro: Equatable, RawRepresentable, CustomStringConvertible {
+    /// No equatable macro
+    case none
+    /// The name and the module for the macro, e.g. `@Equatable,EquatableMacroLib`
+    case macro(String, module: String)
+
+    public init?(rawValue: String) {
+        let components = rawValue.components(separatedBy: ",")
+        if components.count == 2 {
+            self = .macro(components[0], module: components[1])
+        } else if rawValue == "none" {
+            self = .none
+        } else {
+            return nil
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .none:
+            return "none"
+        case let .macro(name, module: module):
+            return "\(name),\(module)"
+        }
+    }
+
+    public var description: String {
+        rawValue
+    }
+}
+
 /// Configuration options for formatting. These aren't actually used by the
 /// Formatter class itself, but it makes them available to the format rules.
 public struct FormatOptions: CustomStringConvertible {
@@ -666,6 +710,7 @@ public struct FormatOptions: CustomStringConvertible {
     public var customTypeMarks: Set<String>
     public var blankLineAfterSubgroups: Bool
     public var alphabeticallySortedDeclarationPatterns: Set<String>
+    public var swiftUIPropertiesSortMode: SwiftUIPropertiesSortMode
     public var yodaSwap: YodaMode
     public var extensionACLPlacement: ExtensionACLPlacement
     public var propertyTypes: PropertyTypes
@@ -673,6 +718,7 @@ public struct FormatOptions: CustomStringConvertible {
     public var inferredTypesInConditionalExpressions: Bool
     public var emptyBracesSpacing: EmptyBracesSpacing
     public var acronyms: Set<String>
+    public var preserveAcronyms: Set<String>
     public var indentStrings: Bool
     public var closureVoidReturn: ClosureVoidReturn
     public var enumNamespaces: EnumNamespacesMode
@@ -690,6 +736,9 @@ public struct FormatOptions: CustomStringConvertible {
     public var timeZone: FormatTimeZone
     public var nilInit: NilInitType
     public var preservedPrivateDeclarations: Set<String>
+    public var additionalXCTestSymbols: Set<String>
+    public var equatableMacro: EquatableMacro
+    public var preferFileMacro: Bool
 
     /// Deprecated
     public var indentComments: Bool
@@ -791,6 +840,7 @@ public struct FormatOptions: CustomStringConvertible {
                 customTypeMarks: Set<String> = [],
                 blankLineAfterSubgroups: Bool = true,
                 alphabeticallySortedDeclarationPatterns: Set<String> = [],
+                swiftUIPropertiesSortMode: SwiftUIPropertiesSortMode = .none,
                 yodaSwap: YodaMode = .always,
                 extensionACLPlacement: ExtensionACLPlacement = .onExtension,
                 propertyTypes: PropertyTypes = .inferLocalsOnly,
@@ -798,6 +848,7 @@ public struct FormatOptions: CustomStringConvertible {
                 inferredTypesInConditionalExpressions: Bool = false,
                 emptyBracesSpacing: EmptyBracesSpacing = .noSpace,
                 acronyms: Set<String> = ["ID", "URL", "UUID"],
+                preserveAcronyms: Set<String> = [],
                 indentStrings: Bool = false,
                 closureVoidReturn: ClosureVoidReturn = .remove,
                 enumNamespaces: EnumNamespacesMode = .always,
@@ -815,6 +866,9 @@ public struct FormatOptions: CustomStringConvertible {
                 timeZone: FormatTimeZone = .system,
                 nilInit: NilInitType = .remove,
                 preservedPrivateDeclarations: Set<String> = [],
+                additionalXCTestSymbols: Set<String> = [],
+                equatableMacro: EquatableMacro = .none,
+                preferFileMacro: Bool = true,
                 // Doesn't really belong here, but hard to put elsewhere
                 fragment: Bool = false,
                 ignoreConflictMarkers: Bool = false,
@@ -906,6 +960,7 @@ public struct FormatOptions: CustomStringConvertible {
         self.customTypeMarks = customTypeMarks
         self.blankLineAfterSubgroups = blankLineAfterSubgroups
         self.alphabeticallySortedDeclarationPatterns = alphabeticallySortedDeclarationPatterns
+        self.swiftUIPropertiesSortMode = swiftUIPropertiesSortMode
         self.yodaSwap = yodaSwap
         self.extensionACLPlacement = extensionACLPlacement
         self.propertyTypes = propertyTypes
@@ -913,6 +968,7 @@ public struct FormatOptions: CustomStringConvertible {
         self.inferredTypesInConditionalExpressions = inferredTypesInConditionalExpressions
         self.emptyBracesSpacing = emptyBracesSpacing
         self.acronyms = acronyms
+        self.preserveAcronyms = preserveAcronyms
         self.indentStrings = indentStrings
         self.closureVoidReturn = closureVoidReturn
         self.enumNamespaces = enumNamespaces
@@ -930,6 +986,9 @@ public struct FormatOptions: CustomStringConvertible {
         self.timeZone = timeZone
         self.nilInit = nilInit
         self.preservedPrivateDeclarations = preservedPrivateDeclarations
+        self.additionalXCTestSymbols = additionalXCTestSymbols
+        self.equatableMacro = equatableMacro
+        self.preferFileMacro = preferFileMacro
         // Doesn't really belong here, but hard to put elsewhere
         self.fragment = fragment
         self.ignoreConflictMarkers = ignoreConflictMarkers

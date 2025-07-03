@@ -412,6 +412,15 @@ class ExtensionAccessControlTests: XCTestCase {
         testFormatting(for: input, rule: .extensionAccessControl)
     }
 
+    func testNoHoistAccessModifierForExtensionThatAddsPreconcurrencyProtocolConformance() {
+        let input = """
+        extension Foo: @preconcurrency Bar {
+            public func bar() {}
+        }
+        """
+        testFormatting(for: input, rule: .extensionAccessControl)
+    }
+
     func testProtocolConformanceCheckNotFooledByWhereClause() {
         let input = """
         extension Foo where Self: Bar {
@@ -458,6 +467,6 @@ class ExtensionAccessControlTests: XCTestCase {
         }
         """
 
-        testFormatting(for: input, rule: .extensionAccessControl)
+        testFormatting(for: input, rule: .extensionAccessControl, exclude: [.emptyExtensions])
     }
 }

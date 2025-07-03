@@ -396,6 +396,7 @@ public extension Token {
     var isSpaceOrLinebreak: Bool { isSpace || isLinebreak }
     var isSpaceOrComment: Bool { isSpace || isComment }
     var isSpaceOrCommentOrLinebreak: Bool { isSpaceOrComment || isLinebreak }
+    var isNonSpaceOrCommentOrLinebreak: Bool { !isSpaceOrCommentOrLinebreak }
     var isCommentOrLinebreak: Bool { isComment || isLinebreak }
 
     var isSwitchCaseOrDefault: Bool {
@@ -561,12 +562,17 @@ extension Collection where Element == Token, Index == Int {
     }
 
     /// A string representation of this array of tokens,
-    /// excluding any newlines and following indentation.
-    var stringExcludingLinebreaks: String {
+    /// excluding any newlines and following indentation, comments, or leading/trailing spaces.
+    var stringExcludingLinebreaksAndComments: String {
         var tokens: [Token] = []
 
         var index = indices.startIndex
         while index < indices.endIndex {
+            // Exclude any comments
+            while self[index].isComment, index < indices.endIndex {
+                index += 1
+            }
+
             // Skip over any linebreaks, and any indentation following the linebreak
             if self[index].isLinebreak {
                 index += 1
@@ -575,11 +581,13 @@ extension Collection where Element == Token, Index == Int {
                 }
             }
 
-            tokens.append(self[index])
-            index += 1
+            if index < indices.endIndex {
+                tokens.append(self[index])
+                index += 1
+            }
         }
 
-        return tokens.string
+        return tokens.string.trimmingCharacters(in: .whitespaces)
     }
 }
 
@@ -1847,9 +1855,9 @@ public func tokenize(_ source: String) -> [Token] {
                     return
                 case .keyword("throws"):
                     break
-                case .keyword where !token.isAttribute, .endOfScope:
-                    // If we encountered a keyword, or closing scope token that wasn't >
-                    // then the opening < must have been an operator after all
+                case .keyword where !token.isAttribute && token != .keyword("repeat"), .endOfScope:
+                    // If we encountered a keyword other than `repeat`, or closing scope
+                    // token that wasn't > then the opening < must have been an operator after all
                     convertOpeningChevronToOperator(at: scopeIndex)
                     processToken()
                     return

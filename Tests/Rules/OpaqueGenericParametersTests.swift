@@ -317,7 +317,7 @@ class OpaqueGenericParametersTests: XCTestCase {
     func testGenericTypeWithClosureInWhereClauseDoesntCrash() {
         let input = """
         struct Foo<U> {
-            func bar<V>(_ value: V) where U == @Sendable (V) -> Int {}
+            func bar<V>(_: V) where U == @Sendable (V) -> Int {}
         }
         """
 
@@ -370,7 +370,7 @@ class OpaqueGenericParametersTests: XCTestCase {
     func testIssue1269() {
         let input = """
         func bar<V, R>(
-            _ value: V,
+            _: V,
             _ work: () -> R
         ) -> R
             where Value == @Sendable () -> V,
@@ -524,7 +524,7 @@ class OpaqueGenericParametersTests: XCTestCase {
         let input = "extension Array where Element == Foo {}"
 
         let options = FormatOptions(swiftVersion: "5.6")
-        testFormatting(for: input, rule: .opaqueGenericParameters, options: options)
+        testFormatting(for: input, rule: .opaqueGenericParameters, options: options, exclude: [.emptyExtensions])
     }
 
     func testOpaqueGenericParametersRuleSuccessfullyTerminatesInSampleCode() {
@@ -690,5 +690,64 @@ class OpaqueGenericParametersTests: XCTestCase {
         let options = FormatOptions(swiftVersion: "5.7")
         testFormatting(for: input, output, rule: .opaqueGenericParameters,
                        options: options, exclude: [.unusedArguments])
+    }
+
+    func testUpdatesProtocolRequirements() {
+        let input = """
+        protocol FooProtocol {
+            func foo<T>(_ foos: T) where T: Collection, T.Element == Foo
+            func bar<T: Collection>(_ bars: T)
+        }
+        """
+
+        let output = """
+        protocol FooProtocol {
+            func foo(_ foos: some Collection<Foo>) 
+            func bar(_ bars: some Collection)
+        }
+        """
+
+        let options = FormatOptions(swiftVersion: "5.7")
+        testFormatting(for: input, output, rule: .opaqueGenericParameters,
+                       options: options, exclude: [.unusedArguments, .trailingSpace])
+    }
+
+    func testPreservesGenericUsedInBodyAtEndOfScope() {
+        let input = """
+        extension ModelTransformer {
+          public static func decodableTransformer<T: Decodable>(for _: T.Type) -> ValueTransformer {
+            CodableTransformer<T>.default
+          }
+        }
+        """
+
+        let options = FormatOptions(swiftVersion: "5.7")
+        testFormatting(for: input, rule: .opaqueGenericParameters,
+                       options: options, exclude: [.unusedArguments, .indent])
+    }
+
+    func testUpdatesNestedFunction() {
+        let input = """
+        func test() {
+            func foo<T: Fooable, U>(_ fooable: T, barable: U) -> Baaz where U: Barable {
+                print(fooable, barable)
+            }
+
+            print(foo(fooable, barable))
+        }
+        """
+
+        let output = """
+        func test() {
+            func foo(_ fooable: some Fooable, barable: some Barable) -> Baaz {
+                print(fooable, barable)
+            }
+
+            print(foo(fooable, barable))
+        }
+        """
+
+        let options = FormatOptions(swiftVersion: "5.7")
+        testFormatting(for: input, output, rule: .opaqueGenericParameters, options: options)
     }
 }

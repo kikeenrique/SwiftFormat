@@ -265,7 +265,7 @@ class FormatterTests: XCTestCase {
     func testMalformedDirective2() {
         let input = "// swiftformat: --disable all"
         XCTAssertThrowsError(try format(input, rules: FormatRules.default).output) { error in
-            XCTAssertEqual("\(error)", "Expected directive after \'swiftformat:\' prefix on line 1")
+            XCTAssert(error.localizedDescription.hasSuffix("Expected directive after \'swiftformat:\' prefix on line 1."))
         }
     }
 
@@ -555,7 +555,7 @@ class FormatterTests: XCTestCase {
         ].flatMap { $0 }
 
         let formatter = Formatter(input, trackChanges: true)
-        formatter.replaceAllTokens(with: output)
+        formatter.diffAndReplaceTokens(in: ClosedRange(formatter.tokens.indices), with: output)
         XCTAssertEqual(sourceCode(for: formatter.tokens), sourceCode(for: output))
 
         // The changes should include both moves and non-moves
