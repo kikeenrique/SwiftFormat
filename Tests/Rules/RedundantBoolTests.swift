@@ -399,4 +399,223 @@ class RedundantBoolTests: XCTestCase {
         """
         testFormatting(for: input, rule: .redundantBool)
     }
+
+    // MARK: - Additional Edge Cases and Negative Tests
+
+    func testFunctionReturnComparison() throws {
+        let input = """
+        if isReady() == true {
+            proceed()
+        }
+        """
+        let output = """
+        if isReady() {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testComputedPropertyComparison() throws {
+        let input = """
+        var isActive: Bool {
+            return state == true
+        }
+        """
+        let output = """
+        var isActive: Bool {
+            return state
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testNestedExpressionComparison() throws {
+        let input = """
+        if (user.isActive && settings.enabled) == true {
+            proceed()
+        }
+        """
+        let output = """
+        if (user.isActive && settings.enabled) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator, .redundantParens])
+    }
+
+    func testReturnStatementComparison() throws {
+        let input = """
+        return isValid == true
+        """
+        let output = """
+        return isValid
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testClosureComparison() throws {
+        let input = """
+        let filtered = items.filter { $0.isEnabled == true }
+        """
+        let output = """
+        let filtered = items.filter { $0.isEnabled }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Negative Tests (Should NOT be transformed)
+
+    func testArrayLastShouldNotBeTransformed() throws {
+        let input = """
+        if flags.last == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testArrayFirstShouldNotBeTransformed() throws {
+        let input = """
+        if flags.first == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testDictionaryAccessShouldNotBeTransformed() throws {
+        let input = """
+        if settings["enabled"] == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testArraySubscriptShouldNotBeTransformed() throws {
+        let input = """
+        if flags[0] == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalChainingWithQuestionMarkShouldNotBeTransformed() throws {
+        let input = """
+        if user?.isActive == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testComplexOptionalChainingWithQuestionMarkShouldNotBeTransformed() throws {
+        let input = """
+        if user?.profile?.settings?.isPublic == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testNilCoalescingOperatorShouldNotBeTransformed() throws {
+        let input = """
+        if (user?.isActive ?? false) == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalMethodCallShouldNotBeTransformed() throws {
+        let input = """
+        if collection.first() == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalMinMaxShouldNotBeTransformed() throws {
+        let input = """
+        if values.min() == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    // MARK: - Complex Expression Tests
+
+    func testComplexPropertyAccessComparison() throws {
+        let input = """
+        if obj.property.subProperty == true {
+            proceed()
+        }
+        """
+        let output = """
+        if obj.property.subProperty {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testParenthesizedExpressionComparison() throws {
+        let input = """
+        if (isValid) == true {
+            proceed()
+        }
+        """
+        let output = """
+        if (isValid) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testMethodCallWithParametersComparison() throws {
+        let input = """
+        if validator.check(input: data) == true {
+            proceed()
+        }
+        """
+        let output = """
+        if validator.check(input: data) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testStaticPropertyComparison() throws {
+        let input = """
+        if MyClass.isEnabled == true {
+            proceed()
+        }
+        """
+        let output = """
+        if MyClass.isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testSelfPropertyComparison() throws {
+        let input = """
+        if self.isReady == true {
+            proceed()
+        }
+        """
+        let output = """
+        if self.isReady {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantSelf])
+    }
 }

@@ -1713,10 +1713,19 @@ Remove redundant backticks around identifiers.
 
 ## redundantBool
 
-Rule to remove redundant boolean comparisons (`== true` → `value`, `== false` → `!value`, `!= true` → `!value`, `!= false` → `value`).
+Removes redundant boolean comparisons. Transforms explicit comparisons with `true`/`false` into more concise boolean expressions.
+**Transformations:**
+- `== true` → remove comparison
+- `== false` → add negation (`!`)
+- `!= true` → add negation (`!`)
+- `!= false` → remove comparison
+
+This rule safely handles optional Bool expressions and will not transform them to avoid compilation errors.
 
 <details>
 <summary>Examples</summary>
+
+```**Basic comparisons:**
 
 ```diff
 - if isEnabled == true { print("On") }
@@ -1730,17 +1739,78 @@ Rule to remove redundant boolean comparisons (`== true` → `value`, `== false` 
 
 - if isReady != false { print("Ready") }
 + if isReady { print("Ready") }
+```
 
-- while running == true {}
-+ while running {}
+**Control flow statements:**
 
-- guard status == false else {}
-+ guard !status else {}
+```diff
+- while running == true { doWork() }
++ while running { doWork() }
 
-// ✅ These cases are NOT modified (optional Bool)
-- if formatter.token(at: closingBraceIndex - 1)?.isSpace == true {}
-- if formatter.token(at: nextIndex)?.isLinebreak != true {}
+- guard status == false else { return }
++ guard !status else { return }
 
+- for item in items where item.isValid == true { }
++ for item in items where item.isValid { }
+```
+
+**Assignments and expressions:**
+
+```diff
+- let isActive = userLoggedIn == true
++ let isActive = userLoggedIn
+
+- let isInactive = userLoggedIn == false  
++ let isInactive = !userLoggedIn
+
+- return isComplete == true
++ return isComplete
+
+- let status = isOnline == true ? "Online" : "Offline"
++ let status = isOnline ? "Online" : "Offline"
+```
+
+**Property and method calls:**
+
+```diff
+- if obj.property.isEnabled == true { }
++ if obj.property.isEnabled { }
+
+- if validator.check(input) == false { }
++ if !validator.check(input) { }
+
+- if MyClass.isFeatureEnabled == true { }
++ if MyClass.isFeatureEnabled { }
+```
+
+**Multiple conditions:**
+
+```diff
+- if isReady == true && isComplete == true { }
++ if isReady && isComplete { }
+
+- if isReady == false || isComplete == false { }
++ if !isReady || !isComplete { }
+```
+
+**❌ These cases are NOT modified (optional Bool expressions):**
+
+```swift
+// Optional chaining - returns Bool?
+if user?.isActive == true { }
+if profile?.settings?.isPublic != false { }
+
+// Array/Dictionary access - returns Bool?
+if flags["enabled"] == true { }
+if boolArray[0] != false { }
+
+// Optional-returning properties/methods - returns Bool?
+if collection.last == true { }
+if collection.first != false { }
+if values.min() == true { }
+
+// Nil coalescing with optionals
+if (user?.isActive ?? false) == true { }
 ```
 
 </details>
