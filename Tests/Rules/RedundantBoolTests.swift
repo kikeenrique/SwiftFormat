@@ -768,4 +768,207 @@ class RedundantBoolTests: XCTestCase {
         // Should NOT transform - optional chaining makes the result Bool?
         testFormatting(for: input, rule: .redundantBool)
     }
+
+    // MARK: - Comments Between Operator and Boolean
+
+    func testCommentBetweenOperatorAndTrue() throws {
+        let input = """
+        if isEnabled == /* comment */ true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testCommentBetweenOperatorAndFalse() throws {
+        let input = """
+        if isEnabled == /* comment */ false {
+            proceed()
+        }
+        """
+        let output = """
+        if !isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testMultilineCommentBetweenOperatorAndBoolean() throws {
+        let input = """
+        if isEnabled == /* multi
+           line
+           comment */ true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Multiple Newlines
+
+    func testMultipleNewlinesAfterOperator() throws {
+        let input = """
+        if isEnabled ==
+
+            true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testMultipleNewlinesBeforeOperator() throws {
+        let input = """
+        if isEnabled
+
+            == true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Complex Boolean Expressions
+
+    func testComplexBooleanExpressionWithParens() throws {
+        let input = """
+        if (a && b) == true || (c && d) == false {
+            proceed()
+        }
+        """
+        let output = """
+        if (a && b) || !(c && d) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator, .redundantParens])
+    }
+
+    func testComplexExpressionInTernary() throws {
+        let input = """
+        let result = (x > 5 && y < 10) == true ? "yes" : "no"
+        """
+        let output = """
+        let result = (x > 5 && y < 10) ? "yes" : "no"
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator, .redundantParens])
+    }
+
+    // MARK: - Force Unwrapped Optionals
+
+    func testForceUnwrappedOptionalWithTrue() throws {
+        let input = """
+        if optional! == true {
+            proceed()
+        }
+        """
+        let output = """
+        if optional! {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testForceUnwrappedOptionalWithFalse() throws {
+        let input = """
+        if optional! == false {
+            proceed()
+        }
+        """
+        let output = """
+        if !optional! {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Switch Statement Cases
+
+    func testComparisonInSwitchCondition() throws {
+        let input = """
+        switch value == true {
+        case true: break
+        case false: break
+        }
+        """
+        let output = """
+        switch value {
+        case true: break
+        case false: break
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Mixed Whitespace Types
+
+    func testMixedSpacesAndNewlines() throws {
+        let input = """
+        if isEnabled
+            ==
+            true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Chained Comparisons
+
+    func testMultipleComparisonsInSequence() throws {
+        let input = """
+        if a == true && b == true && c == false {
+            proceed()
+        }
+        """
+        let output = """
+        if a && b && !c {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator])
+    }
+
+    // MARK: - Array/Dictionary with Known Non-Optional Return
+
+    func testNonOptionalSubscript() throws {
+        // This test documents current conservative behavior
+        // In reality, we can't know if a subscript returns Bool or Bool?
+        // without type information, so we conservatively skip all subscripts
+        let input = """
+        if boolArray[0] == true {
+            proceed()
+        }
+        """
+        // Current behavior: does NOT transform (conservative)
+        testFormatting(for: input, rule: .redundantBool)
+    }
 }

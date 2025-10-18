@@ -30,7 +30,7 @@ public extension FormatRule {
             }
 
             // Check for Boolean after operator compare
-            guard let nextIndex = formatter.index(after: i, where: { !$0.isSpaceOrComment }),
+            guard let nextIndex = formatter.index(after: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
                   case let .identifier(value) = formatter.tokens[nextIndex],
                   value == "true" || value == "false",
                   // Skip backticked identifiers (variables named `true` or `false`)
@@ -44,7 +44,7 @@ public extension FormatRule {
             var expressionStartIndex = i
             var foundOptionalPattern = false
 
-            while let prevIndex = formatter.index(before: expressionStartIndex, where: { !$0.isSpaceOrComment }) {
+            while let prevIndex = formatter.index(before: expressionStartIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) {
                 let prevToken = formatter.tokens[prevIndex]
 
                 // Check for explicit optional operators
@@ -91,7 +91,7 @@ public extension FormatRule {
 
             // Additional safety check: if the expression immediately before the operator
             // doesn't look like a simple non-optional identifier or property access, skip it
-            if let beforeOperatorIndex = formatter.index(before: i, where: { !$0.isSpaceOrComment }) {
+            if let beforeOperatorIndex = formatter.index(before: i, where: { !$0.isSpaceOrCommentOrLinebreak }) {
                 let beforeToken = formatter.tokens[beforeOperatorIndex]
 
                 // Skip if the left side is a standalone backticked variable named `true` or `false`
@@ -101,7 +101,7 @@ public extension FormatRule {
                    beforeToken.string == "`true`" || beforeToken.string == "`false`"
                 {
                     // Check if this is a property access (has a . before it)
-                    if let beforeIdentifier = formatter.index(before: beforeOperatorIndex, where: { !$0.isSpaceOrComment }),
+                    if let beforeIdentifier = formatter.index(before: beforeOperatorIndex, where: { !$0.isSpaceOrCommentOrLinebreak }),
                        formatter.tokens[beforeIdentifier] == .operator(".", .infix)
                     {
                         // It's a property like obj.`false`, allow transformation
@@ -111,7 +111,8 @@ public extension FormatRule {
                 }
 
                 // Only transform simple cases: identifiers or simple property access
-                if !beforeToken.isIdentifier, beforeToken != .endOfScope(")") {
+                // Also allow force unwrapped optionals (!) since they return non-optional values
+                if !beforeToken.isIdentifier, beforeToken != .endOfScope(")"), beforeToken != .operator("!", .postfix) {
                     return // Skip complex expressions
                 }
 
@@ -133,10 +134,15 @@ public extension FormatRule {
 
             // Find the start of the expression (for negation placement)
             var expressionStart = i
-            while let prevIndex = formatter.index(before: expressionStart, where: { !$0.isSpaceOrComment }) {
+            while let prevIndex = formatter.index(before: expressionStart, where: { !$0.isSpaceOrCommentOrLinebreak }) {
                 let prevToken = formatter.tokens[prevIndex]
-                if prevToken.isIdentifier || prevToken == .operator(".", .infix) || prevToken == .endOfScope(")") {
+                if prevToken.isIdentifier || prevToken == .operator(".", .infix) || prevToken == .endOfScope(")") || prevToken == .operator("!", .postfix) {
                     expressionStart = prevIndex
+                    // If we hit a closing paren, find the matching opening paren
+                    if prevToken == .endOfScope(")"),
+                       let openParen = formatter.index(of: .startOfScope("("), before: prevIndex) {
+                        expressionStart = openParen
+                    }
                 } else {
                     break
                 }
@@ -149,7 +155,7 @@ public extension FormatRule {
             // Walk backwards to include all whitespace/comments/newlines before the operator
             var checkIndex = i
             while let prevIndex = formatter.index(before: checkIndex, where: { _ in true }),
-                  formatter.tokens[prevIndex].isSpaceOrComment
+                  formatter.tokens[prevIndex].isSpaceOrCommentOrLinebreak
             {
                 removeStartIndex = prevIndex
                 checkIndex = prevIndex
