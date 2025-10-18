@@ -24,6 +24,10 @@ public extension FormatRule {
         options: [],
         sharedOptions: []
     ) { formatter in
+        // Properties and methods known to return optional values
+        let optionalReturningProperties = ["last", "first"]
+        let optionalReturningMethods = ["last", "first", "min", "max", "popLast", "popFirst"]
+
         formatter.forEachToken { i, token in
             guard case let .operator(op, .infix) = token, op == "==" || op == "!=" else {
                 return
@@ -63,7 +67,7 @@ public extension FormatRule {
                 }
 
                 // Check for known optional-returning property names
-                if prevToken.isIdentifier, ["last", "first"].contains(prevToken.string) {
+                if prevToken.isIdentifier, optionalReturningProperties.contains(prevToken.string) {
                     foundOptionalPattern = true
                     break
                 }
@@ -75,7 +79,7 @@ public extension FormatRule {
                        let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier })
                     {
                         let methodName = formatter.tokens[methodNameIndex].string
-                        if ["last", "first", "min", "max", "popLast", "popFirst"].contains(methodName) {
+                        if optionalReturningMethods.contains(methodName) {
                             foundOptionalPattern = true
                             break
                         }
@@ -122,8 +126,6 @@ public extension FormatRule {
                        let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier })
                     {
                         let methodName = formatter.tokens[methodNameIndex].string
-                        // Blacklist of known optional-returning methods
-                        let optionalReturningMethods = ["last", "first", "min", "max", "popLast", "popFirst"]
                         if optionalReturningMethods.contains(methodName) {
                             return // Known optional-returning method, skip
                         }
@@ -249,6 +251,16 @@ public extension FormatRule {
 
         - if isReady == false || isComplete == false { }
         + if !isReady || !isComplete { }
+        ```
+
+        **✅ Force unwrapped optionals ARE transformed (returns non-optional Bool):**
+
+        ```diff
+        - if optional! == true { }
+        + if optional! { }
+
+        - if optional! == false { }
+        + if !optional! { }
         ```
 
         **❌ These cases are NOT modified (optional Bool expressions):**
