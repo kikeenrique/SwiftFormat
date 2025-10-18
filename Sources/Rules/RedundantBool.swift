@@ -32,7 +32,9 @@ public extension FormatRule {
             // Check for Boolean after operator compare
             guard let nextIndex = formatter.index(after: i, where: { !$0.isSpaceOrComment }),
                   case let .identifier(value) = formatter.tokens[nextIndex],
-                  value == "true" || value == "false"
+                  value == "true" || value == "false",
+                  // Skip backticked identifiers (variables named `true` or `false`)
+                  value.first != "`"
             else {
                 return
             }
@@ -91,6 +93,14 @@ public extension FormatRule {
             // doesn't look like a simple non-optional identifier or property access, skip it
             if let beforeOperatorIndex = formatter.index(before: i, where: { !$0.isSpaceOrComment }) {
                 let beforeToken = formatter.tokens[beforeOperatorIndex]
+
+                // Skip if the left side is a backticked variable named `true` or `false`
+                if beforeToken.isIdentifier,
+                   beforeToken.string.first == "`",
+                   (beforeToken.string == "`true`" || beforeToken.string == "`false`")
+                {
+                    return // Don't transform variables named `true` or `false`
+                }
 
                 // Only transform simple cases: identifiers or simple property access
                 if !beforeToken.isIdentifier, beforeToken != .endOfScope(")") {
