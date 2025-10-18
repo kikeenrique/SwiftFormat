@@ -618,4 +618,152 @@ class RedundantBoolTests: XCTestCase {
         """
         testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantSelf])
     }
+
+    // MARK: - Whitespace Edge Cases
+
+    func testNoSpacesAroundOperator() throws {
+        let input = """
+        if isEnabled==true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testMultipleSpacesAroundOperator() throws {
+        let input = """
+        if isEnabled  ==  true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testNewlineBeforeOperator() throws {
+        let input = """
+        if isEnabled
+            == true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testNewlineAfterOperator() throws {
+        let input = """
+        if isEnabled ==
+            true {
+            proceed()
+        }
+        """
+        let output = """
+        if isEnabled {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Backtick Identifier Edge Cases
+
+    func testBacktickIdentifierNamedTrue() throws {
+        let input = """
+        let `true` = false
+        if `true` == true {
+            proceed()
+        }
+        """
+        // Should NOT transform - `true` is a variable, not a boolean literal
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testBacktickIdentifierNamedFalse() throws {
+        let input = """
+        let `false` = true
+        if `false` == false {
+            proceed()
+        }
+        """
+        // Should NOT transform - `false` is a variable, not a boolean literal
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testPropertyWithBacktickName() throws {
+        let input = """
+        if obj.`false` == true {
+            proceed()
+        }
+        """
+        let output = """
+        if obj.`false` {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Boolean on Left Side
+
+    func testTrueOnLeftSide() throws {
+        let input = """
+        if true == isEnabled {
+            proceed()
+        }
+        """
+        // Currently not supported, but should document this behavior
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testFalseOnLeftSide() throws {
+        let input = """
+        if false == isEnabled {
+            proceed()
+        }
+        """
+        // Currently not supported, but should document this behavior
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    // MARK: - Complex Whitespace in Property Chains
+
+    func testComplexPropertyChainWithWhitespace() throws {
+        let input = """
+        if obj . property . subProperty == true {
+            proceed()
+        }
+        """
+        let output = """
+        if obj . property . subProperty {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // MARK: - Mixed Optional Chaining
+
+    func testOptionalInMiddleOfChain() throws {
+        let input = """
+        if user?.settings.isEnabled == true {
+            proceed()
+        }
+        """
+        // Should NOT transform - optional chaining makes the result Bool?
+        testFormatting(for: input, rule: .redundantBool)
+    }
 }
