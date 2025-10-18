@@ -98,7 +98,7 @@ public extension FormatRule {
                 // (but not properties like obj.`false`)
                 if beforeToken.isIdentifier,
                    beforeToken.string.first == "`",
-                   (beforeToken.string == "`true`" || beforeToken.string == "`false`")
+                   beforeToken.string == "`true`" || beforeToken.string == "`false`"
                 {
                     // Check if this is a property access (has a . before it)
                     if let beforeIdentifier = formatter.index(before: beforeOperatorIndex, where: { !$0.isSpaceOrComment }),
@@ -142,15 +142,17 @@ public extension FormatRule {
                 }
             }
 
-            // The removal range: from the space before the operator (if any) to the boolean value
-            // This handles cases like: `isEnabled == true`, `isEnabled==true`, `isEnabled  ==  true`
+            // The removal range: from any whitespace before the operator to the boolean value
+            // This handles cases like: `isEnabled == true`, `isEnabled==true`, multi-line comparisons, etc.
             var removeStartIndex = i
 
-            // Check if there's whitespace immediately before the operator
-            if let prevIndex = formatter.index(before: i, where: { _ in true }),
-               formatter.tokens[prevIndex].isSpaceOrComment
+            // Walk backwards to include all whitespace/comments/newlines before the operator
+            var checkIndex = i
+            while let prevIndex = formatter.index(before: checkIndex, where: { _ in true }),
+                  formatter.tokens[prevIndex].isSpaceOrComment
             {
                 removeStartIndex = prevIndex
+                checkIndex = prevIndex
             }
 
             if value == "true" {
