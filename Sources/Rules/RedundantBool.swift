@@ -160,7 +160,7 @@ public extension FormatRule {
         }
     } examples: {
         """
-        ```**Basic comparisons:**
+        **Basic comparisons:**
 
         ```diff
         - if isEnabled == true { print("On") }

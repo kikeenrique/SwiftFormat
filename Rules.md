@@ -1946,7 +1946,7 @@ This rule safely handles optional Bool expressions and will not transform them t
 <details>
 <summary>Examples</summary>
 
-```**Basic comparisons:**
+**Basic comparisons:**
 
 ```diff
 - if isEnabled == true { print("On") }
