@@ -94,12 +94,20 @@ public extension FormatRule {
             if let beforeOperatorIndex = formatter.index(before: i, where: { !$0.isSpaceOrComment }) {
                 let beforeToken = formatter.tokens[beforeOperatorIndex]
 
-                // Skip if the left side is a backticked variable named `true` or `false`
+                // Skip if the left side is a standalone backticked variable named `true` or `false`
+                // (but not properties like obj.`false`)
                 if beforeToken.isIdentifier,
                    beforeToken.string.first == "`",
                    (beforeToken.string == "`true`" || beforeToken.string == "`false`")
                 {
-                    return // Don't transform variables named `true` or `false`
+                    // Check if this is a property access (has a . before it)
+                    if let beforeIdentifier = formatter.index(before: beforeOperatorIndex, where: { !$0.isSpaceOrComment }),
+                       formatter.tokens[beforeIdentifier] == .operator(".", .infix)
+                    {
+                        // It's a property like obj.`false`, allow transformation
+                    } else {
+                        return // Standalone variable named `true` or `false`, skip transformation
+                    }
                 }
 
                 // Only transform simple cases: identifiers or simple property access
@@ -134,18 +142,15 @@ public extension FormatRule {
                 }
             }
 
-            // The removal range should include spaces around the operator and the boolean value
-            // Find the first space/comment after the comparison expression
-            var removeStartIndex = i + 1
-            while removeStartIndex < formatter.tokens.count,
-                  formatter.tokens[removeStartIndex].isSpaceOrComment
-            {
-                removeStartIndex += 1
-            }
+            // The removal range: from the space before the operator (if any) to the boolean value
+            // This handles cases like: `isEnabled == true`, `isEnabled==true`, `isEnabled  ==  true`
+            var removeStartIndex = i
 
-            // Move back to include any space before the operator
-            if let spaceBeforeOp = formatter.index(before: i, where: { $0.isSpaceOrComment }) {
-                removeStartIndex = spaceBeforeOp
+            // Check if there's whitespace immediately before the operator
+            if let prevIndex = formatter.index(before: i, where: { _ in true }),
+               formatter.tokens[prevIndex].isSpaceOrComment
+            {
+                removeStartIndex = prevIndex
             }
 
             if value == "true" {

@@ -725,8 +725,9 @@ class RedundantBoolTests: XCTestCase {
             proceed()
         }
         """
-        // Currently not supported, but should document this behavior
-        testFormatting(for: input, rule: .redundantBool)
+        // The yodaConditions rule will swap this to isEnabled == true,
+        // then redundantBool will remove == true. Exclude yodaConditions to test just redundantBool.
+        testFormatting(for: input, rule: .redundantBool, exclude: [.yodaConditions])
     }
 
     func testFalseOnLeftSide() throws {
@@ -735,8 +736,9 @@ class RedundantBoolTests: XCTestCase {
             proceed()
         }
         """
-        // Currently not supported, but should document this behavior
-        testFormatting(for: input, rule: .redundantBool)
+        // The yodaConditions rule will swap this to isEnabled == false,
+        // then redundantBool will negate it. Exclude yodaConditions to test just redundantBool.
+        testFormatting(for: input, rule: .redundantBool, exclude: [.yodaConditions])
     }
 
     // MARK: - Complex Whitespace in Property Chains
@@ -752,7 +754,7 @@ class RedundantBoolTests: XCTestCase {
             proceed()
         }
         """
-        testFormatting(for: input, output, rule: .redundantBool)
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.spaceAroundOperators])
     }
 
     // MARK: - Mixed Optional Chaining
