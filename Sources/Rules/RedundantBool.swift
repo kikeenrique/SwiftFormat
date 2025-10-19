@@ -25,8 +25,9 @@ public extension FormatRule {
         sharedOptions: []
     ) { formatter in
         // Properties and methods known to return optional values
-        let optionalReturningProperties = ["last", "first"]
-        let optionalReturningMethods = ["last", "first", "min", "max", "popLast", "popFirst"]
+        // Using Sets for O(1) membership testing
+        let optionalReturningProperties: Set = ["last", "first"]
+        let optionalReturningMethods: Set = ["last", "first", "min", "max", "popLast", "popFirst", "randomElement"]
 
         formatter.forEachToken { i, token in
             guard case let .operator(op, .infix) = token, op == "==" || op == "!=" else {

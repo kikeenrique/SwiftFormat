@@ -547,6 +547,15 @@ class RedundantBoolTests: XCTestCase {
         testFormatting(for: input, rule: .redundantBool)
     }
 
+    func testOptionalRandomElementShouldNotBeTransformed() throws {
+        let input = """
+        if items.randomElement() == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
     // MARK: - Complex Expression Tests
 
     func testComplexPropertyAccessComparison() throws {
