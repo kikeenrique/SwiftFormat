@@ -38,8 +38,9 @@ public extension FormatRule {
 
                 // Explicit optional operators: ?, ??, etc.
                 if token == .operator("?", .postfix) ||
-                   token == .operator("?", .infix) ||
-                   token == .operator("??", .infix) {
+                    token == .operator("?", .infix) ||
+                    token == .operator("??", .infix)
+                {
                     return true
                 }
 
@@ -57,7 +58,8 @@ public extension FormatRule {
                 if token == .endOfScope(")"),
                    let methodStartIndex = formatter.index(of: .startOfScope("("), before: prevIndex),
                    let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier }),
-                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string) {
+                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string)
+                {
                     return true
                 }
 
@@ -73,13 +75,15 @@ public extension FormatRule {
 
             guard token.isIdentifier,
                   token.string.first == "`",
-                  token.string == "`true`" || token.string == "`false`" else {
+                  token.string == "`true`" || token.string == "`false`"
+            else {
                 return false
             }
 
             // Check if it's a property (obj.`false`) - those are OK to transform
             if let beforeIndex = formatter.index(before: index, where: { !$0.isSpaceOrCommentOrLinebreak }),
-               formatter.tokens[beforeIndex] == .operator(".", .infix) {
+               formatter.tokens[beforeIndex] == .operator(".", .infix)
+            {
                 return false // It's a property, not a standalone variable
             }
 
@@ -100,7 +104,8 @@ public extension FormatRule {
                 if token == .endOfScope(")"),
                    let methodStartIndex = formatter.index(of: .startOfScope("("), before: index),
                    let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier }),
-                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string) {
+                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string)
+                {
                     return false // Known optional-returning method
                 }
                 return true
@@ -117,14 +122,16 @@ public extension FormatRule {
                 let token = formatter.tokens[prevIndex]
 
                 if token.isIdentifier ||
-                   token == .operator(".", .infix) ||
-                   token == .endOfScope(")") ||
-                   token == .operator("!", .postfix) {
+                    token == .operator(".", .infix) ||
+                    token == .endOfScope(")") ||
+                    token == .operator("!", .postfix)
+                {
                     startIndex = prevIndex
 
                     // If we hit a closing paren, jump to the matching opening paren
                     if token == .endOfScope(")"),
-                       let openParen = formatter.index(of: .startOfScope("("), before: prevIndex) {
+                       let openParen = formatter.index(of: .startOfScope("("), before: prevIndex)
+                    {
                         startIndex = openParen
                     }
                 } else {
@@ -142,12 +149,13 @@ public extension FormatRule {
             // Walk backwards to include all whitespace/comments/newlines before the operator
             var checkIndex = operatorIndex
             while let prevIndex = formatter.index(before: checkIndex, where: { _ in true }),
-                  formatter.tokens[prevIndex].isSpaceOrCommentOrLinebreak {
+                  formatter.tokens[prevIndex].isSpaceOrCommentOrLinebreak
+            {
                 startIndex = prevIndex
                 checkIndex = prevIndex
             }
 
-            return startIndex...boolIndex
+            return startIndex ... boolIndex
         }
 
         formatter.forEachToken { i, token in
@@ -160,7 +168,8 @@ public extension FormatRule {
             guard let boolIndex = formatter.index(after: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
                   case let .identifier(boolValue) = formatter.tokens[boolIndex],
                   boolValue == "true" || boolValue == "false",
-                  boolValue.first != "`" else { // Skip backticked identifiers
+                  boolValue.first != "`"
+            else { // Skip backticked identifiers
                 return
             }
 
@@ -171,7 +180,8 @@ public extension FormatRule {
 
             // Step 4: Skip if the left side is a backticked variable named `true` or `false`
             guard let beforeIndex = formatter.index(before: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
-                  !isBacktickedBoolVariable(at: beforeIndex) else {
+                  !isBacktickedBoolVariable(at: beforeIndex)
+            else {
                 return
             }
 

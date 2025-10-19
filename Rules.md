@@ -2014,6 +2014,16 @@ This rule safely handles optional Bool expressions and will not transform them t
 + if !isReady || !isComplete { }
 ```
 
+**✅ Force unwrapped optionals ARE transformed (returns non-optional Bool):**
+
+```diff
+- if optional! == true { }
++ if optional! { }
+
+- if optional! == false { }
++ if !optional! { }
+```
+
 **❌ These cases are NOT modified (optional Bool expressions):**
 
 ```swift
