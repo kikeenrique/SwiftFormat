@@ -29,158 +29,181 @@ public extension FormatRule {
         let optionalReturningProperties: Set = ["last", "first"]
         let optionalReturningMethods: Set = ["last", "first", "min", "max", "popLast", "popFirst", "randomElement"]
 
+        /// Helper: Check if token at index appears to be an optional-returning expression
+        func isOptionalExpression(beforeIndex: Int) -> Bool {
+            var checkIndex = beforeIndex
+
+            while let prevIndex = formatter.index(before: checkIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) {
+                let token = formatter.tokens[prevIndex]
+
+                // Explicit optional operators: ?, ??, etc.
+                if token == .operator("?", .postfix) ||
+                   token == .operator("?", .infix) ||
+                   token == .operator("??", .infix) {
+                    return true
+                }
+
+                // Subscript access (dictionary/array)
+                if token == .endOfScope("]") {
+                    return true
+                }
+
+                // Known optional-returning properties
+                if token.isIdentifier, optionalReturningProperties.contains(token.string) {
+                    return true
+                }
+
+                // Known optional-returning methods
+                if token == .endOfScope(")"),
+                   let methodStartIndex = formatter.index(of: .startOfScope("("), before: prevIndex),
+                   let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier }),
+                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string) {
+                    return true
+                }
+
+                checkIndex = prevIndex
+            }
+
+            return false
+        }
+
+        /// Helper: Check if identifier is a standalone backticked `true` or `false` variable
+        func isBacktickedBoolVariable(at index: Int) -> Bool {
+            let token = formatter.tokens[index]
+
+            guard token.isIdentifier,
+                  token.string.first == "`",
+                  token.string == "`true`" || token.string == "`false`" else {
+                return false
+            }
+
+            // Check if it's a property (obj.`false`) - those are OK to transform
+            if let beforeIndex = formatter.index(before: index, where: { !$0.isSpaceOrCommentOrLinebreak }),
+               formatter.tokens[beforeIndex] == .operator(".", .infix) {
+                return false // It's a property, not a standalone variable
+            }
+
+            return true // It's a standalone variable
+        }
+
+        /// Helper: Check if the expression is simple enough to safely transform
+        func isSimpleExpression(beforeIndex: Int) -> Bool {
+            guard let index = formatter.index(before: beforeIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) else {
+                return false
+            }
+
+            let token = formatter.tokens[index]
+
+            // Allow: identifiers, method calls, force unwraps
+            if token.isIdentifier || token == .endOfScope(")") || token == .operator("!", .postfix) {
+                // For method calls, check if it's an optional-returning method
+                if token == .endOfScope(")"),
+                   let methodStartIndex = formatter.index(of: .startOfScope("("), before: index),
+                   let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier }),
+                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string) {
+                    return false // Known optional-returning method
+                }
+                return true
+            }
+
+            return false
+        }
+
+        /// Helper: Find the start of the expression for negation placement
+        func findExpressionStart(beforeIndex: Int) -> Int {
+            var startIndex = beforeIndex
+
+            while let prevIndex = formatter.index(before: startIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) {
+                let token = formatter.tokens[prevIndex]
+
+                if token.isIdentifier ||
+                   token == .operator(".", .infix) ||
+                   token == .endOfScope(")") ||
+                   token == .operator("!", .postfix) {
+                    startIndex = prevIndex
+
+                    // If we hit a closing paren, jump to the matching opening paren
+                    if token == .endOfScope(")"),
+                       let openParen = formatter.index(of: .startOfScope("("), before: prevIndex) {
+                        startIndex = openParen
+                    }
+                } else {
+                    break
+                }
+            }
+
+            return startIndex
+        }
+
+        /// Helper: Find the range to remove (including whitespace before operator)
+        func findRemovalRange(from operatorIndex: Int, to boolIndex: Int) -> ClosedRange<Int> {
+            var startIndex = operatorIndex
+
+            // Walk backwards to include all whitespace/comments/newlines before the operator
+            var checkIndex = operatorIndex
+            while let prevIndex = formatter.index(before: checkIndex, where: { _ in true }),
+                  formatter.tokens[prevIndex].isSpaceOrCommentOrLinebreak {
+                startIndex = prevIndex
+                checkIndex = prevIndex
+            }
+
+            return startIndex...boolIndex
+        }
+
         formatter.forEachToken { i, token in
+            // Step 1: Check if this is a comparison operator (== or !=)
             guard case let .operator(op, .infix) = token, op == "==" || op == "!=" else {
                 return
             }
 
-            // Check for Boolean after operator compare
-            guard let nextIndex = formatter.index(after: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
-                  case let .identifier(value) = formatter.tokens[nextIndex],
-                  value == "true" || value == "false",
-                  // Skip backticked identifiers (variables named `true` or `false`)
-                  value.first != "`"
-            else {
+            // Step 2: Check if the right side is a boolean literal (true or false)
+            guard let boolIndex = formatter.index(after: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
+                  case let .identifier(boolValue) = formatter.tokens[boolIndex],
+                  boolValue == "true" || boolValue == "false",
+                  boolValue.first != "`" else { // Skip backticked identifiers
                 return
             }
 
-            // Check if the expression before the operator is optional
-            // This is a conservative approach - we skip transformation for any potentially optional expression
-            var expressionStartIndex = i
-            var foundOptionalPattern = false
-
-            while let prevIndex = formatter.index(before: expressionStartIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) {
-                let prevToken = formatter.tokens[prevIndex]
-
-                // Check for explicit optional operators
-                if prevToken == .operator("?", .postfix) ||
-                    prevToken == .operator("?", .infix) ||
-                    prevToken == .operator("??", .infix)
-                {
-                    foundOptionalPattern = true
-                    break
-                }
-
-                // Check for array/dictionary access patterns
-                if prevToken == .endOfScope("]") {
-                    foundOptionalPattern = true
-                    break
-                }
-
-                // Check for known optional-returning property names
-                if prevToken.isIdentifier, optionalReturningProperties.contains(prevToken.string) {
-                    foundOptionalPattern = true
-                    break
-                }
-
-                // Check for method calls that might return optionals
-                if prevToken == .endOfScope(")") {
-                    // Look for method name before the parentheses
-                    if let methodStartIndex = formatter.index(of: .startOfScope("("), before: prevIndex),
-                       let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier })
-                    {
-                        let methodName = formatter.tokens[methodNameIndex].string
-                        if optionalReturningMethods.contains(methodName) {
-                            foundOptionalPattern = true
-                            break
-                        }
-                    }
-                }
-
-                expressionStartIndex = prevIndex
+            // Step 3: Skip if the left side appears to return an optional
+            guard !isOptionalExpression(beforeIndex: i) else {
+                return
             }
 
-            if foundOptionalPattern {
-                return // Optional detected, skip transformation
+            // Step 4: Skip if the left side is a backticked variable named `true` or `false`
+            guard let beforeIndex = formatter.index(before: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
+                  !isBacktickedBoolVariable(at: beforeIndex) else {
+                return
             }
 
-            // Additional safety check: if the expression immediately before the operator
-            // doesn't look like a simple non-optional identifier or property access, skip it
-            if let beforeOperatorIndex = formatter.index(before: i, where: { !$0.isSpaceOrCommentOrLinebreak }) {
-                let beforeToken = formatter.tokens[beforeOperatorIndex]
-
-                // Skip if the left side is a standalone backticked variable named `true` or `false`
-                // (but not properties like obj.`false`)
-                if beforeToken.isIdentifier,
-                   beforeToken.string.first == "`",
-                   beforeToken.string == "`true`" || beforeToken.string == "`false`"
-                {
-                    // Check if this is a property access (has a . before it)
-                    if let beforeIdentifier = formatter.index(before: beforeOperatorIndex, where: { !$0.isSpaceOrCommentOrLinebreak }),
-                       formatter.tokens[beforeIdentifier] == .operator(".", .infix)
-                    {
-                        // It's a property like obj.`false`, allow transformation
-                    } else {
-                        return // Standalone variable named `true` or `false`, skip transformation
-                    }
-                }
-
-                // Only transform simple cases: identifiers or simple property access
-                // Also allow force unwrapped optionals (!) since they return non-optional values
-                if !beforeToken.isIdentifier, beforeToken != .endOfScope(")"), beforeToken != .operator("!", .postfix) {
-                    return // Skip complex expressions
-                }
-
-                // For method calls, skip only methods known to return optionals
-                if beforeToken == .endOfScope(")") {
-                    if let methodStartIndex = formatter.index(of: .startOfScope("("), before: beforeOperatorIndex),
-                       let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier })
-                    {
-                        let methodName = formatter.tokens[methodNameIndex].string
-                        if optionalReturningMethods.contains(methodName) {
-                            return // Known optional-returning method, skip
-                        }
-                    }
-                    // Allow all other method calls
-                }
+            // Step 5: Skip if the expression is too complex to safely transform
+            guard isSimpleExpression(beforeIndex: i) else {
+                return
             }
 
-            // Find the start of the expression (for negation placement)
-            var expressionStart = i
-            while let prevIndex = formatter.index(before: expressionStart, where: { !$0.isSpaceOrCommentOrLinebreak }) {
-                let prevToken = formatter.tokens[prevIndex]
-                if prevToken.isIdentifier || prevToken == .operator(".", .infix) || prevToken == .endOfScope(")") || prevToken == .operator("!", .postfix) {
-                    expressionStart = prevIndex
-                    // If we hit a closing paren, find the matching opening paren
-                    if prevToken == .endOfScope(")"),
-                       let openParen = formatter.index(of: .startOfScope("("), before: prevIndex) {
-                        expressionStart = openParen
-                    }
-                } else {
-                    break
-                }
-            }
+            // Step 6: Find where to place the negation operator (if needed)
+            let expressionStart = findExpressionStart(beforeIndex: i)
 
-            // The removal range: from any whitespace before the operator to the boolean value
-            // This handles cases like: `isEnabled == true`, `isEnabled==true`, multi-line comparisons, etc.
-            var removeStartIndex = i
+            // Step 7: Find the range to remove (operator and boolean literal)
+            let removalRange = findRemovalRange(from: i, to: boolIndex)
 
-            // Walk backwards to include all whitespace/comments/newlines before the operator
-            var checkIndex = i
-            while let prevIndex = formatter.index(before: checkIndex, where: { _ in true }),
-                  formatter.tokens[prevIndex].isSpaceOrCommentOrLinebreak
-            {
-                removeStartIndex = prevIndex
-                checkIndex = prevIndex
-            }
-
-            if value == "true" {
+            // Step 8: Apply the transformation based on operator and boolean value
+            if boolValue == "true" {
                 if op == "==" {
-                    // Remove ` == true`
-                    formatter.removeTokens(in: removeStartIndex ... nextIndex)
+                    // `expr == true` → `expr`
+                    formatter.removeTokens(in: removalRange)
                 } else {
-                    // Replace `!= true` with `!expression`
-                    formatter.removeTokens(in: removeStartIndex ... nextIndex)
+                    // `expr != true` → `!expr`
+                    formatter.removeTokens(in: removalRange)
                     formatter.insert(.operator("!", .prefix), at: expressionStart)
                 }
-            } else if value == "false" {
+            } else { // boolValue == "false"
                 if op == "==" {
-                    // Replace `== false` with `!expression`
-                    formatter.removeTokens(in: removeStartIndex ... nextIndex)
+                    // `expr == false` → `!expr`
+                    formatter.removeTokens(in: removalRange)
                     formatter.insert(.operator("!", .prefix), at: expressionStart)
                 } else {
-                    // Remove `!= false`
-                    formatter.removeTokens(in: removeStartIndex ... nextIndex)
+                    // `expr != false` → `expr`
+                    formatter.removeTokens(in: removalRange)
                 }
             }
         }
