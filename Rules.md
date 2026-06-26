@@ -2012,7 +2012,7 @@ Prefer `count(where:)` over `filter(_:).count`.
 
 ## preferExplicitFalse
 
-Prefer `== false` over `!` prefix negation.
+Prefer `== false` over `!` prefix negation. This rule is the inverse of the default `redundantBool` rule and is mutually exclusive with it — enable only one.
 
 <details>
 <summary>Examples</summary>
@@ -2382,6 +2382,8 @@ Removes redundant boolean comparisons. Transforms explicit comparisons with `tru
 - `!= false` → remove comparison
 
 This rule safely handles optional Bool expressions and will not transform them to avoid compilation errors.
+
+This rule is the inverse of the opt-in `preferExplicitFalse` rule and is mutually exclusive with it — enable only one.
 
 <details>
 <summary>Examples</summary>

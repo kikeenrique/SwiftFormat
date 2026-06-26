@@ -20,6 +20,8 @@ public extension FormatRule {
         - `!= false` → remove comparison
 
         This rule safely handles optional Bool expressions and will not transform them to avoid compilation errors.
+
+        This rule is the inverse of the opt-in `preferExplicitFalse` rule and is mutually exclusive with it — enable only one.
         """,
         options: [],
         sharedOptions: []
