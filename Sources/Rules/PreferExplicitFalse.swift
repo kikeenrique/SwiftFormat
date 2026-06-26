@@ -12,7 +12,7 @@ public extension FormatRule {
     /// Convert prefix `!` negation to explicit `== false` comparison.
     /// This improves readability for teams who find the `!` prefix easy to miss.
     static let preferExplicitFalse = FormatRule(
-        help: "Prefer `== false` over `!` prefix negation. This rule is the inverse of the default `redundantBool` rule and is mutually exclusive with it — enable only one.",
+        help: "Prefer `== false` over `!` prefix negation. This rule is the inverse of `redundantBool` and is mutually exclusive with it — enable only one.",
         disabledByDefault: true
     ) { formatter in
         formatter.forEach(.operator("!", .prefix)) { notIndex, _ in

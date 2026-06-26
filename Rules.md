@@ -48,7 +48,6 @@
 * [preferKeyPath](#preferKeyPath)
 * [redundantAsync](#redundantAsync)
 * [redundantBackticks](#redundantBackticks)
-* [redundantBool](#redundantBool)
 * [redundantBreak](#redundantBreak)
 * [redundantClosure](#redundantClosure)
 * [redundantEmptyView](#redundantEmptyView)
@@ -132,6 +131,7 @@
 * [preferSwiftTesting](#preferSwiftTesting)
 * [privateStateVariables](#privateStateVariables)
 * [propertyTypes](#propertyTypes)
+* [redundantBool](#redundantBool)
 * [singlePropertyPerLine](#singlePropertyPerLine)
 * [sortSwitchCases](#sortSwitchCases)
 * [testSuiteAccessControl](#testSuiteAccessControl)
@@ -2012,7 +2012,7 @@ Prefer `count(where:)` over `filter(_:).count`.
 
 ## preferExplicitFalse
 
-Prefer `== false` over `!` prefix negation. This rule is the inverse of the default `redundantBool` rule and is mutually exclusive with it — enable only one.
+Prefer `== false` over `!` prefix negation. This rule is the inverse of `redundantBool` and is mutually exclusive with it — enable only one.
 
 <details>
 <summary>Examples</summary>
@@ -2374,116 +2374,43 @@ Remove redundant backticks around identifiers.
 
 ## redundantBool
 
-Removes redundant boolean comparisons. Transforms explicit comparisons with `true`/`false` into more concise boolean expressions.
-**Transformations:**
-- `== true` → remove comparison
-- `== false` → add negation (`!`)
-- `!= true` → add negation (`!`)
-- `!= false` → remove comparison
+Removes redundant comparisons with `true`/`false`, but only when the left-hand side is provably a non-optional `Bool`:
 
-This rule safely handles optional Bool expressions and will not transform them to avoid compilation errors.
+- A parenthesized boolean expression, e.g. `(a && b) == true` → `(a && b)`
+- A `!`-negated expression, e.g. `!isReady == false` → `isReady`
+- A name resolvable in the same file to a non-optional `Bool` — a local `let`/`var`, a function parameter, a `self` property, or a same-file method returning `Bool`.
 
-This rule is the inverse of the opt-in `preferExplicitFalse` rule and is mutually exclusive with it — enable only one.
+Anything whose type can't be resolved locally (members of other types, values from other files, complex inference) is left unchanged, since removing the comparison could fail to compile if the value is actually optional.
+
+This rule is the inverse of `preferExplicitFalse` and is mutually exclusive with it — enable only one.
 
 <details>
 <summary>Examples</summary>
 
-**Basic comparisons:**
-
 ```diff
-- if isEnabled == true { print("On") }
-+ if isEnabled { print("On") }
+- if (a && b) == true {
++ if (a && b) {
 
-- if isDisabled == false { print("Off") }
-+ if !isDisabled { print("Off") }
-
-- if isOnline != true { print("Offline") }
-+ if !isOnline { print("Offline") }
-
-- if isReady != false { print("Ready") }
-+ if isReady { print("Ready") }
+- if !isReady == false {
++ if isReady {
 ```
 
-**Control flow statements:**
-
 ```diff
-- while running == true { doWork() }
-+ while running { doWork() }
-
-- guard status == false else { return }
-+ guard !status else { return }
-
-- for item in items where item.isValid == true { }
-+ for item in items where item.isValid { }
+  func handle(isEnabled: Bool) {
+-     if isEnabled == true {
++     if isEnabled {
+  }
 ```
 
-**Assignments and expressions:**
-
-```diff
-- let isActive = userLoggedIn == true
-+ let isActive = userLoggedIn
-
-- let isInactive = userLoggedIn == false  
-+ let isInactive = !userLoggedIn
-
-- return isComplete == true
-+ return isComplete
-
-- let status = isOnline == true ? "Online" : "Offline"
-+ let status = isOnline ? "Online" : "Offline"
-```
-
-**Property and method calls:**
-
-```diff
-- if obj.property.isEnabled == true { }
-+ if obj.property.isEnabled { }
-
-- if validator.check(input) == false { }
-+ if !validator.check(input) { }
-
-- if MyClass.isFeatureEnabled == true { }
-+ if MyClass.isFeatureEnabled { }
-```
-
-**Multiple conditions:**
-
-```diff
-- if isReady == true && isComplete == true { }
-+ if isReady && isComplete { }
-
-- if isReady == false || isComplete == false { }
-+ if !isReady || !isComplete { }
-```
-
-**✅ Force unwrapped optionals ARE transformed (returns non-optional Bool):**
-
-```diff
-- if optional! == true { }
-+ if optional! { }
-
-- if optional! == false { }
-+ if !optional! { }
-```
-
-**❌ These cases are NOT modified (optional Bool expressions):**
+These are **not** modified, because the left-hand side can't be proven to
+be a non-optional `Bool` from the current file:
 
 ```swift
-// Optional chaining - returns Bool?
-if user?.isActive == true { }
-if profile?.settings?.isPublic != false { }
-
-// Array/Dictionary access - returns Bool?
-if flags["enabled"] == true { }
-if boolArray[0] != false { }
-
-// Optional-returning properties/methods - returns Bool?
-if collection.last == true { }
-if collection.first != false { }
-if values.min() == true { }
-
-// Nil coalescing with optionals
-if (user?.isActive ?? false) == true { }
+if otherObject.isActive == true {}  // member of another type
+if importedValue == true {}         // declared in another file
+if value! == true {}                // force-unwrap
+if dict[key] == true {}             // subscript
+if user?.isActive == true {}        // optional
 ```
 
 </details>

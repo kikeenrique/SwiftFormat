@@ -57,8 +57,7 @@ final class YodaConditionsTests: XCTestCase {
         let output = """
         foo != true
         """
-        testFormatting(for: input, output, rule: .yodaConditions,
-                       exclude: [.redundantBool])
+        testFormatting(for: input, output, rule: .yodaConditions)
     }
 
     func testEnumCaseNotEqualYodaCondition() {
@@ -323,8 +322,7 @@ final class YodaConditionsTests: XCTestCase {
         let output = """
         !foo == true
         """
-        testFormatting(for: input, output, rule: .yodaConditions,
-                       exclude: [.redundantBool])
+        testFormatting(for: input, output, rule: .yodaConditions, exclude: [.redundantBool])
     }
 
     func testPostfixExpressionYodaCondition() {

@@ -9,975 +9,1093 @@
 import SwiftFormat
 import XCTest
 
-class RedundantBoolTests: XCTestCase {
-    func testRedundantComparisonWithTrue() throws {
-        let input = """
-        if isEnabled == true {
-            print("Enabled")
-        }
-        """
-        let output = """
-        if isEnabled {
-            print("Enabled")
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
+final class RedundantBoolTests: XCTestCase {
+    // Syntactically a Bool: parenthesized boolean expressions.
 
-    func testRedundantComparisonWithFalse() throws {
+    func testParenthesizedAndWithTrue() {
         let input = """
-        if isDisabled == false {
-            print("Not Disabled")
-        }
-        """
-        let output = """
-        if !isDisabled {
-            print("Not Disabled")
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testWhileLoopWithRedundantTrue() throws {
-        let input = """
-        while running == true {
-            doSomething()
-        }
-        """
-        let output = """
-        while running {
-            doSomething()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testGuardStatementWithRedundantFalse() throws {
-        let input = """
-        guard status == false else {
-            return
-        }
-        """
-        let output = """
-        guard !status else {
-            return
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // Additional Test Cases
-    func testLetAssignmentWithTrue() throws {
-        let input = """
-        let isActive = userLoggedIn == true
-        """
-        let output = """
-        let isActive = userLoggedIn
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testLetAssignmentWithFalse() throws {
-        let input = """
-        let isInactive = userLoggedIn == false
-        """
-        let output = """
-        let isInactive = !userLoggedIn
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testTernaryOperatorWithTrue() throws {
-        let input = """
-        let status = isOnline == true ? "Online" : "Offline"
-        """
-        let output = """
-        let status = isOnline ? "Online" : "Offline"
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testTernaryOperatorWithFalse() throws {
-        let input = """
-        let status = isOnline == false ? "Offline" : "Online"
-        """
-        let output = """
-        let status = !isOnline ? "Offline" : "Online"
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testLetAssignmentCombinedVariableWithTrue() throws {
-        let input = """
-        let isActive = resourceValues.isDirectory == true
-        """
-        let output = """
-        let isActive = resourceValues.isDirectory
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testLetAssignmentCombinedVariableWithFalse() throws {
-        let input = """
-        let isInactive = resourceValues.isDirectory == false
-        """
-        let output = """
-        let isInactive = !resourceValues.isDirectory
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testMultipleConditionsSeparatorAndWithTrue() throws {
-        let input = """
-        if isReady == true && isComplete == true {
+        if (a && b) == true {
             proceed()
         }
         """
         let output = """
-        if isReady && isComplete {
+        if (a && b) {
             proceed()
         }
         """
-        testFormatting(for: input, output, rule: .redundantBool,
-                       exclude: [.andOperator])
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
     }
 
-    func testMultipleConditionsSeparatorCommaWithTrue() throws {
+    func testParenthesizedComparisonWithFalse() {
         let input = """
-        if isReady == true, isComplete == true {
-            proceed()
-        }
-        """
-        let output = """
-        if isReady, isComplete {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testMultipleConditionsWithFalse() throws {
-        let input = """
-        if isReady == false || isComplete == false {
-            stop()
-        }
-        """
-        let output = """
-        if !isReady || !isComplete {
-            stop()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testRedundantComparisonWithNotTrue() throws {
-        let input = """
-        if isEnabled != true {
-            print("Not Enabled")
-        }
-        """
-        let output = """
-        if !isEnabled {
-            print("Not Enabled")
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testRedundantComparisonWithNotFalse() throws {
-        let input = """
-        if isDisabled != false {
-            print("Disabled")
-        }
-        """
-        let output = """
-        if isDisabled {
-            print("Disabled")
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testWhileLoopWithNotTrue() throws {
-        let input = """
-        while running != true {
-            doSomething()
-        }
-        """
-        let output = """
-        while !running {
-            doSomething()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testGuardStatementWithNotFalse() throws {
-        let input = """
-        guard status != false else {
-            return
-        }
-        """
-        let output = """
-        guard status else {
-            return
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testTernaryOperatorWithNotTrue() throws {
-        let input = """
-        let status = isOnline != true ? "Offline" : "Online"
-        """
-        let output = """
-        let status = !isOnline ? "Offline" : "Online"
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testTernaryOperatorWithNotFalse() throws {
-        let input = """
-        let status = isOnline != false ? "Online" : "Offline"
-        """
-        let output = """
-        let status = isOnline ? "Online" : "Offline"
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testMultipleConditionsWithNotTrue() throws {
-        let input = """
-        if isReady != true && isComplete != true {
-            stop()
-        }
-        """
-        let output = """
-        if !isReady && !isComplete {
-            stop()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool,
-                       exclude: [.andOperator])
-    }
-
-    func testMultipleConditionsWithNotFalse() throws {
-        let input = """
-        if isReady != false || isComplete != false {
+        if (x < y) == false {
             proceed()
         }
         """
         let output = """
-        if isReady || isComplete {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testPropertyBooleanComparisonWithTrue() throws {
-        let input = """
-        if resourceValues.isDirectory == true {
-            print("Is a directory")
-        }
-        """
-        let output = """
-        if resourceValues.isDirectory {
-            print("Is a directory")
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testPropertyBooleanComparisonWithFalse() throws {
-        let input = """
-        if resourceValues.isDirectory == false {
-            print("Not a directory")
-        }
-        """
-        let output = """
-        if !resourceValues.isDirectory {
-            print("Not a directory")
-        }
-        """
-
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testPropertyBooleanComparisonWithNotTrue() throws {
-        let input = """
-        if resourceValues.isDirectory != true {
-            print("Not Enabled")
-        }
-        """
-        let output = """
-        if !resourceValues.isDirectory {
-            print("Not Enabled")
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testPropertyBooleanComparisonWithNotFalse() throws {
-        let input = """
-        if resourceValues.isDirectory != false {
-            print("Disabled")
-        }
-        """
-        let output = """
-        if resourceValues.isDirectory {
-            print("Disabled")
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testOptionalBooleanComparisonWithNotTrue() throws {
-        let input = """
-        if resourceValues?.isDirectory != true {
-            print("Not Enabled")
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testOptionalBooleanComparisonWithNotFalse() throws {
-        let input = """
-        if resourceValues?.isDirectory != false {
-            print("Disabled")
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testOptionalParenBooleanComparisonWithNotTrue() throws {
-        let input = """
-        if options.rules?.contains("wrapEnumCases") == true {
-            print("Not Enabled")
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testOptionalParenBooleanComparisonWithNotFalse() throws {
-        let input = """
-        if options.rules?.contains("unusedArguments") == false {
-            print("Disabled")
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testWhileOptionalBooleanComparisonWithNotTrue() throws {
-        let input = """
-        while resourceValues?.isDirectory != true {
-            print("Not Enabled")
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testWhileOptionalBooleanComparisonWithNotFalse() throws {
-        let input = """
-        while resourceValues?.isDirectory != false {
-            print("Disabled")
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testLetOptionalBooleanComparisonWithNotTrue() throws {
-        let input = """
-        let status = resourceValues?.isOnline != true ? "Offline" : "Online"
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testLetOptionalBooleanComparisonWithNotFalse() throws {
-        let input = """
-        let status = resourceValues?.isOnline != false ? "Online" : "Offline"
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    // MARK: - Additional Edge Cases and Negative Tests
-
-    func testFunctionReturnComparison() throws {
-        let input = """
-        if isReady() == true {
-            proceed()
-        }
-        """
-        let output = """
-        if isReady() {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testComputedPropertyComparison() throws {
-        let input = """
-        var isActive: Bool {
-            return state == true
-        }
-        """
-        let output = """
-        var isActive: Bool {
-            return state
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testNestedExpressionComparison() throws {
-        let input = """
-        if (user.isActive && settings.enabled) == true {
-            proceed()
-        }
-        """
-        let output = """
-        if (user.isActive && settings.enabled) {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator, .redundantParens])
-    }
-
-    func testReturnStatementComparison() throws {
-        let input = """
-        return isValid == true
-        """
-        let output = """
-        return isValid
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testClosureComparison() throws {
-        let input = """
-        let filtered = items.filter { $0.isEnabled == true }
-        """
-        let output = """
-        let filtered = items.filter { $0.isEnabled }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // MARK: - Negative Tests (Should NOT be transformed)
-
-    func testArrayLastShouldNotBeTransformed() throws {
-        let input = """
-        if flags.last == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testArrayFirstShouldNotBeTransformed() throws {
-        let input = """
-        if flags.first == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testDictionaryAccessShouldNotBeTransformed() throws {
-        let input = """
-        if settings["enabled"] == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testArraySubscriptShouldNotBeTransformed() throws {
-        let input = """
-        if flags[0] == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testOptionalChainingWithQuestionMarkShouldNotBeTransformed() throws {
-        let input = """
-        if user?.isActive == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testComplexOptionalChainingWithQuestionMarkShouldNotBeTransformed() throws {
-        let input = """
-        if user?.profile?.settings?.isPublic == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testNilCoalescingOperatorShouldNotBeTransformed() throws {
-        let input = """
-        if (user?.isActive ?? false) == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testOptionalMethodCallShouldNotBeTransformed() throws {
-        let input = """
-        if collection.first() == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testOptionalMinMaxShouldNotBeTransformed() throws {
-        let input = """
-        if values.min() == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    func testOptionalRandomElementShouldNotBeTransformed() throws {
-        let input = """
-        if items.randomElement() == true {
-            proceed()
-        }
-        """
-        testFormatting(for: input, rule: .redundantBool)
-    }
-
-    // MARK: - Complex Expression Tests
-
-    func testComplexPropertyAccessComparison() throws {
-        let input = """
-        if obj.property.subProperty == true {
-            proceed()
-        }
-        """
-        let output = """
-        if obj.property.subProperty {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testParenthesizedExpressionComparison() throws {
-        let input = """
-        if (isValid) == true {
-            proceed()
-        }
-        """
-        let output = """
-        if (isValid) {
+        if !(x < y) {
             proceed()
         }
         """
         testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens])
     }
 
-    func testMethodCallWithParametersComparison() throws {
+    func testParenthesizedOrWithNotTrue() {
         let input = """
-        if validator.check(input: data) == true {
+        if (a || b) != true {
             proceed()
         }
         """
         let output = """
-        if validator.check(input: data) {
+        if !(a || b) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
+    }
+
+    func testParenthesizedEqualityWithNotFalse() {
+        let input = """
+        if (a == b) != false {
+            proceed()
+        }
+        """
+        let output = """
+        if (a == b) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testParenthesizedGreaterThanOrEqual() {
+        let input = """
+        if (count >= limit) == true {
+            proceed()
+        }
+        """
+        let output = """
+        if (count >= limit) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testParenthesizedIsCheck() {
+        let input = """
+        if (value is Foo) == true {
+            proceed()
+        }
+        """
+        let output = """
+        if (value is Foo) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testNestedParensWithFalse() {
+        let input = """
+        if ((a) && b) == false {
+            proceed()
+        }
+        """
+        let output = """
+        if !((a) && b) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
+    }
+
+    func testTopLevelComparisonInsideParens() {
+        let input = """
+        if (foo() == bar()) == true {
+            proceed()
+        }
+        """
+        let output = """
+        if (foo() == bar()) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testNegationWithinCompoundCondition() {
+        let input = """
+        if x && (a < b) == false {
+            proceed()
+        }
+        """
+        let output = """
+        if x && !(a < b) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
+    }
+
+    func testMultipleParenthesizedComparisons() {
+        let input = """
+        if (a && b) == true && (c || d) == false {
+            proceed()
+        }
+        """
+        let output = """
+        if (a && b) && !(c || d) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
+    }
+
+    // Syntactically a Bool: `!`-negated expressions.
+
+    func testNegatedExpressionWithTrue() {
+        let input = """
+        if !isReady == true {
+            proceed()
+        }
+        """
+        let output = """
+        if !isReady {
             proceed()
         }
         """
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
-    func testStaticPropertyComparison() throws {
+    func testNegatedExpressionWithFalseCollapses() {
         let input = """
-        if MyClass.isEnabled == true {
+        if !isReady == false {
             proceed()
         }
         """
         let output = """
-        if MyClass.isEnabled {
+        if isReady {
             proceed()
         }
         """
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
-    func testSelfPropertyComparison() throws {
+    func testNegatedExpressionWithNotTrueCollapses() {
         let input = """
-        if self.isReady == true {
+        if !isReady != true {
             proceed()
         }
         """
         let output = """
-        if self.isReady {
+        if isReady {
             proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testNegatedMemberChainWithFalseCollapses() {
+        let input = """
+        if !obj.flag == false {
+            proceed()
+        }
+        """
+        let output = """
+        if obj.flag {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testNegatedParenthesizedCollapses() {
+        let input = """
+        if !(a && b) == false {
+            proceed()
+        }
+        """
+        let output = """
+        if (a && b) {
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
+    }
+
+    // Resolved to a non-optional Bool: function parameters.
+
+    func testFunctionParameterInIf() {
+        let input = """
+        func handle(isEnabled: Bool) {
+            if isEnabled == true {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func handle(isEnabled: Bool) {
+            if isEnabled {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testFunctionParameterWithFalse() {
+        let input = """
+        func handle(isEnabled: Bool) {
+            if isEnabled == false {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func handle(isEnabled: Bool) {
+            if !isEnabled {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testFunctionParameterInWhile() {
+        let input = """
+        func handle(running: Bool) {
+            while running == true {
+                work()
+            }
+        }
+        """
+        let output = """
+        func handle(running: Bool) {
+            while running {
+                work()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testFunctionParameterInGuard() {
+        let input = """
+        func handle(valid: Bool) {
+            guard valid == false else { return }
+            proceed()
+        }
+        """
+        let output = """
+        func handle(valid: Bool) {
+            guard !valid else { return }
+            proceed()
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool,
+                       exclude: [.wrapConditionalBodies, .blankLinesAfterGuardStatements])
+    }
+
+    func testFunctionParameterInTernary() {
+        let input = """
+        func describe(online: Bool) -> String {
+            online == true ? "On" : "Off"
+        }
+        """
+        let output = """
+        func describe(online: Bool) -> String {
+            online ? "On" : "Off"
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testFunctionParameterInAssignment() {
+        let input = """
+        func handle(flag: Bool) {
+            let active = flag == true
+            use(active)
+        }
+        """
+        let output = """
+        func handle(flag: Bool) {
+            let active = flag
+            use(active)
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testSecondFunctionParameterResolved() {
+        let input = """
+        func handle(count: Int, enabled: Bool) {
+            if enabled == true {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func handle(count: Int, enabled: Bool) {
+            if enabled {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.unusedArguments])
+    }
+
+    func testParameterCapturedInClosure() {
+        let input = """
+        func handle(flag: Bool) {
+            items.forEach { _ in
+                if flag == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        let output = """
+        func handle(flag: Bool) {
+            items.forEach { _ in
+                if flag {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.preferForLoop])
+    }
+
+    // Resolved to a non-optional Bool: local variables.
+
+    func testLocalLetWithBoolAnnotation() {
+        let input = """
+        func test() {
+            let flag: Bool = compute()
+            if flag == false {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func test() {
+            let flag: Bool = compute()
+            if !flag {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantType, .propertyTypes])
+    }
+
+    func testLocalVarWithTrueLiteral() {
+        let input = """
+        func test() {
+            var flag = true
+            if flag == false {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func test() {
+            var flag = true
+            if !flag {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testLocalLetWithFalseLiteral() {
+        let input = """
+        func test() {
+            let flag = false
+            if flag == true {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func test() {
+            let flag = false
+            if flag {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // Resolved to a non-optional Bool: type properties.
+
+    func testSelfStoredPropertyBool() {
+        let input = """
+        struct Model {
+            var isReady: Bool
+
+            func check() {
+                if self.isReady == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        let output = """
+        struct Model {
+            var isReady: Bool
+
+            func check() {
+                if self.isReady {
+                    proceed()
+                }
+            }
         }
         """
         testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantSelf])
     }
 
-    // MARK: - Whitespace Edge Cases
-
-    func testNoSpacesAroundOperator() throws {
+    func testBareStoredPropertyBool() {
         let input = """
-        if isEnabled==true {
-            proceed()
+        struct Model {
+            var isReady: Bool
+
+            func check() {
+                if isReady == false {
+                    proceed()
+                }
+            }
         }
         """
         let output = """
-        if isEnabled {
-            proceed()
+        struct Model {
+            var isReady: Bool
+
+            func check() {
+                if !isReady {
+                    proceed()
+                }
+            }
         }
         """
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
-    func testMultipleSpacesAroundOperator() throws {
+    func testComputedPropertyBool() {
         let input = """
-        if isEnabled  ==  true {
-            proceed()
+        struct Model {
+            var isReady: Bool {
+                computeReady()
+            }
+
+            func check() {
+                if isReady == true {
+                    proceed()
+                }
+            }
         }
         """
         let output = """
-        if isEnabled {
-            proceed()
+        struct Model {
+            var isReady: Bool {
+                computeReady()
+            }
+
+            func check() {
+                if isReady {
+                    proceed()
+                }
+            }
         }
         """
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
-    func testNewlineBeforeOperator() throws {
+    func testPropertyDeclaredAfterUse() {
         let input = """
-        if isEnabled
-            == true {
-            proceed()
+        struct Model {
+            func check() {
+                if isReady == true {
+                    proceed()
+                }
+            }
+
+            var isReady: Bool
         }
         """
         let output = """
-        if isEnabled {
-            proceed()
+        struct Model {
+            func check() {
+                if isReady {
+                    proceed()
+                }
+            }
+
+            var isReady: Bool
         }
         """
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
-    func testNewlineAfterOperator() throws {
+    func testPropertyInClassBool() {
         let input = """
-        if isEnabled ==
-            true {
-            proceed()
+        class Model {
+            let active: Bool = true
+
+            func check() {
+                if active == false {
+                    proceed()
+                }
+            }
         }
         """
         let output = """
-        if isEnabled {
-            proceed()
+        class Model {
+            let active: Bool = true
+
+            func check() {
+                if !active {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantType, .propertyTypes])
+    }
+
+    // Resolved to a non-optional Bool: same-file methods returning Bool.
+
+    func testBareMethodCallReturningBool() {
+        let input = """
+        struct Model {
+            func isReady() -> Bool {
+                true
+            }
+
+            func check() {
+                if isReady() == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        let output = """
+        struct Model {
+            func isReady() -> Bool {
+                true
+            }
+
+            func check() {
+                if isReady() {
+                    proceed()
+                }
+            }
         }
         """
         testFormatting(for: input, output, rule: .redundantBool)
     }
 
-    // MARK: - Backtick Identifier Edge Cases
-
-    func testBacktickIdentifierNamedTrue() throws {
+    func testSelfMethodCallReturningBool() {
         let input = """
-        let `true` = false
-        if `true` == true {
+        struct Model {
+            func isReady() -> Bool {
+                true
+            }
+
+            func check() {
+                if self.isReady() == false {
+                    proceed()
+                }
+            }
+        }
+        """
+        let output = """
+        struct Model {
+            func isReady() -> Bool {
+                true
+            }
+
+            func check() {
+                if !self.isReady() {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool, exclude: [.redundantSelf])
+    }
+
+    func testMethodWithArgumentsReturningBool() {
+        let input = """
+        struct Model {
+            func matches(_ value: Int) -> Bool {
+                value > 0
+            }
+
+            func check() {
+                if matches(5) == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        let output = """
+        struct Model {
+            func matches(_ value: Int) -> Bool {
+                value > 0
+            }
+
+            func check() {
+                if matches(5) {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    // Not provable — must NOT be transformed (could break the build).
+
+    func testUnresolvedBareIdentifierNotTransformed() {
+        let input = """
+        if flag == true {
             proceed()
         }
         """
-        // Should NOT transform - `true` is a variable, not a boolean literal
         testFormatting(for: input, rule: .redundantBool)
     }
 
-    func testBacktickIdentifierNamedFalse() throws {
+    func testMemberOfOtherObjectNotTransformed() {
         let input = """
-        let `false` = true
-        if `false` == false {
-            proceed()
+        func test() {
+            if object.isActive == true {
+                proceed()
+            }
         }
         """
-        // Should NOT transform - `false` is a variable, not a boolean literal
         testFormatting(for: input, rule: .redundantBool)
     }
 
-    func testPropertyWithBacktickName() throws {
+    func testDeepMemberChainNotTransformed() {
         let input = """
-        if obj.`false` == true {
-            proceed()
+        func test() {
+            if a.b.c == true {
+                proceed()
+            }
         }
         """
-        let output = """
-        if obj.`false` {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // MARK: - Boolean on Left Side
-
-    func testTrueOnLeftSide() throws {
-        let input = """
-        if true == isEnabled {
-            proceed()
-        }
-        """
-        // The yodaConditions rule will swap this to isEnabled == true,
-        // then redundantBool will remove == true. Exclude yodaConditions to test just redundantBool.
-        testFormatting(for: input, rule: .redundantBool, exclude: [.yodaConditions])
-    }
-
-    func testFalseOnLeftSide() throws {
-        let input = """
-        if false == isEnabled {
-            proceed()
-        }
-        """
-        // The yodaConditions rule will swap this to isEnabled == false,
-        // then redundantBool will negate it. Exclude yodaConditions to test just redundantBool.
-        testFormatting(for: input, rule: .redundantBool, exclude: [.yodaConditions])
-    }
-
-    // MARK: - Complex Whitespace in Property Chains
-
-    func testComplexPropertyChainWithWhitespace() throws {
-        let input = """
-        if obj . property . subProperty == true {
-            proceed()
-        }
-        """
-        let output = """
-        if obj . property . subProperty {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool, exclude: [.spaceAroundOperators])
-    }
-
-    // MARK: - Mixed Optional Chaining
-
-    func testOptionalInMiddleOfChain() throws {
-        let input = """
-        if user?.settings.isEnabled == true {
-            proceed()
-        }
-        """
-        // Should NOT transform - optional chaining makes the result Bool?
         testFormatting(for: input, rule: .redundantBool)
     }
 
-    // MARK: - Comments Between Operator and Boolean
-
-    func testCommentBetweenOperatorAndTrue() throws {
+    func testOptionalLocalNotTransformed() {
         let input = """
-        if isEnabled == /* comment */ true {
-            proceed()
+        func test() {
+            let flag: Bool? = compute()
+            if flag == true {
+                proceed()
+            }
         }
         """
-        let output = """
-        if isEnabled {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testCommentBetweenOperatorAndFalse() throws {
-        let input = """
-        if isEnabled == /* comment */ false {
-            proceed()
-        }
-        """
-        let output = """
-        if !isEnabled {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testMultilineCommentBetweenOperatorAndBoolean() throws {
-        let input = """
-        if isEnabled == /* multi
-           line
-           comment */ true {
-            proceed()
-        }
-        """
-        let output = """
-        if isEnabled {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // MARK: - Multiple Newlines
-
-    func testMultipleNewlinesAfterOperator() throws {
-        let input = """
-        if isEnabled ==
-
-            true {
-            proceed()
-        }
-        """
-        let output = """
-        if isEnabled {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testMultipleNewlinesBeforeOperator() throws {
-        let input = """
-        if isEnabled
-
-            == true {
-            proceed()
-        }
-        """
-        let output = """
-        if isEnabled {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // MARK: - Complex Boolean Expressions
-
-    func testComplexBooleanExpressionWithParens() throws {
-        let input = """
-        if (a && b) == true || (c && d) == false {
-            proceed()
-        }
-        """
-        let output = """
-        if (a && b) || !(c && d) {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator, .redundantParens])
-    }
-
-    func testComplexExpressionInTernary() throws {
-        let input = """
-        let result = (x > 5 && y < 10) == true ? "yes" : "no"
-        """
-        let output = """
-        let result = (x > 5 && y < 10) ? "yes" : "no"
-        """
-        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator, .redundantParens])
-    }
-
-    // MARK: - Force Unwrapped Optionals
-
-    func testForceUnwrappedOptionalWithTrue() throws {
-        let input = """
-        if optional! == true {
-            proceed()
-        }
-        """
-        let output = """
-        if optional! {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    func testForceUnwrappedOptionalWithFalse() throws {
-        let input = """
-        if optional! == false {
-            proceed()
-        }
-        """
-        let output = """
-        if !optional! {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // MARK: - Switch Statement Cases
-
-    func testComparisonInSwitchCondition() throws {
-        let input = """
-        switch value == true {
-        case true: break
-        case false: break
-        }
-        """
-        let output = """
-        switch value {
-        case true: break
-        case false: break
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // MARK: - Mixed Whitespace Types
-
-    func testMixedSpacesAndNewlines() throws {
-        let input = """
-        if isEnabled
-            ==
-            true {
-            proceed()
-        }
-        """
-        let output = """
-        if isEnabled {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool)
-    }
-
-    // MARK: - Chained Comparisons
-
-    func testMultipleComparisonsInSequence() throws {
-        let input = """
-        if a == true && b == true && c == false {
-            proceed()
-        }
-        """
-        let output = """
-        if a && b && !c {
-            proceed()
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantBool, exclude: [.andOperator])
-    }
-
-    // MARK: - Array/Dictionary with Known Non-Optional Return
-
-    func testNonOptionalSubscript() throws {
-        // This test documents current conservative behavior
-        // In reality, we can't know if a subscript returns Bool or Bool?
-        // without type information, so we conservatively skip all subscripts
-        let input = """
-        if boolArray[0] == true {
-            proceed()
-        }
-        """
-        // Current behavior: does NOT transform (conservative)
         testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testImplicitlyUnwrappedLocalNotTransformed() {
+        let input = """
+        func test() {
+            let flag: Bool! = compute()
+            if flag == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalParameterNotTransformed() {
+        let input = """
+        func handle(flag: Bool?) {
+            if flag == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalStoredPropertyNotTransformed() {
+        let input = """
+        struct Model {
+            var flag: Bool?
+
+            func check() {
+                if flag == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalSelfPropertyNotTransformed() {
+        let input = """
+        struct Model {
+            var flag: Bool?
+
+            func check() {
+                if self.flag == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.redundantSelf])
+    }
+
+    func testNonBoolPropertyNotTransformed() {
+        let input = """
+        struct Model {
+            var state: State
+
+            func check() {
+                if state == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testMethodReturningOptionalBoolNotTransformed() {
+        let input = """
+        struct Model {
+            func check() -> Bool? {
+                nil
+            }
+
+            func test() {
+                if check() == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testMethodWithNonBoolReturnNotTransformed() {
+        let input = """
+        struct Model {
+            func value() -> Int {
+                0
+            }
+
+            func test() {
+                if value() == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testNonBoolLocalNotTransformed() {
+        let input = """
+        func test() {
+            let flag = compute()
+            if flag == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testForceUnwrapNotTransformed() {
+        let input = """
+        func test() {
+            if value! == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testSubscriptNotTransformed() {
+        let input = """
+        func test() {
+            if dict[key] == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testOptionalChainNotTransformed() {
+        let input = """
+        func test() {
+            if user?.isActive == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testNilCoalescingNotTransformed() {
+        let input = """
+        func test() {
+            if (flag ?? false) == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testAsCastNotTransformed() {
+        let input = """
+        func test() {
+            if (value as? Bool) == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testParenthesizedNonBooleanNotTransformed() {
+        let input = """
+        func test() {
+            if (flag) == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.redundantParens])
+    }
+
+    func testCallInParensNotTransformed() {
+        let input = """
+        func test() {
+            if foo(a == b) == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    // Shadowing — a closer binding overrides an outer Bool.
+
+    func testParameterShadowsBoolPropertyNotTransformed() {
+        let input = """
+        struct Model {
+            var flag: Bool
+
+            func handle(flag: OtherType) {
+                if flag == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testLocalShadowsBoolParameterNotTransformed() {
+        let input = """
+        func handle(flag: Bool) {
+            let flag = makeOther()
+            if flag == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.unusedArguments])
+    }
+
+    func testClosureParameterShadowsBoolPropertyNotTransformed() {
+        let input = """
+        struct Model {
+            var flag: Bool
+
+            func handle() {
+                items.forEach { flag in
+                    if flag == true {
+                        proceed()
+                    }
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.preferForLoop])
+    }
+
+    func testForLoopVariableNotTransformed() {
+        let input = """
+        func handle() {
+            for flag in flags {
+                if flag == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testTupleBindingNotTransformed() {
+        let input = """
+        func handle() {
+            let (flag, count) = compute()
+            if flag == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testGuardLetBindingNotTransformed() {
+        let input = """
+        func handle(value: Bool?) {
+            guard let flag = value else { return }
+            if flag == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool,
+                       exclude: [.wrapConditionalBodies, .blankLinesAfterGuardStatements])
+    }
+
+    func testIfLetBindingNotTransformed() {
+        let input = """
+        func handle(value: Bool?) {
+            if let flag = value, flag == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testCaseLetBindingNotTransformed() {
+        let input = """
+        func handle(value: Foo) {
+            if case let .some(flag) = value {
+                if flag == true {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    // Backtick identifiers and non-literal right-hand sides.
+
+    func testBacktickIdentifierOnLeftNotTransformed() {
+        let input = """
+        func test() {
+            if `true` == true {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testBacktickLiteralOnRightNotTransformed() {
+        let input = """
+        struct Model {
+            var ready: Bool
+
+            func check() {
+                if ready == `true` {
+                    proceed()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    func testComparisonAgainstNonLiteralNotTransformed() {
+        let input = """
+        func handle(flag: Bool) {
+            if flag == other {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool)
+    }
+
+    // Comments in the affected range are preserved (rule bails out).
+
+    func testCommentBetweenOperatorAndLiteralPreserved() {
+        let input = """
+        if (a && b) == /* note */ true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
+    }
+
+    func testCommentBeforeOperatorPreserved() {
+        let input = """
+        if (a && b) /* note */ == true {
+            proceed()
+        }
+        """
+        testFormatting(for: input, rule: .redundantBool, exclude: [.redundantParens, .andOperator])
+    }
+
+    // Whitespace and newlines around the operator.
+
+    func testNoSpacesAroundOperator() {
+        let input = """
+        func handle(flag: Bool) {
+            if flag==true {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func handle(flag: Bool) {
+            if flag {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
+    }
+
+    func testNewlineAroundOperator() {
+        let input = """
+        func handle(flag: Bool) {
+            if flag
+                == true {
+                proceed()
+            }
+        }
+        """
+        let output = """
+        func handle(flag: Bool) {
+            if flag {
+                proceed()
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantBool)
     }
 }

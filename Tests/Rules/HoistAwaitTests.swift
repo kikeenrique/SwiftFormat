@@ -309,6 +309,6 @@ final class HoistAwaitTests: XCTestCase {
         #expect (await monitor.isAvailable == false)
         """
         testFormatting(for: input, rule: .hoistAwait,
-                       options: FormatOptions(swiftVersion: "5.5"), exclude: [.spaceAroundParens, .redundantBool])
+                       options: FormatOptions(swiftVersion: "5.5"), exclude: [.spaceAroundParens])
     }
 }

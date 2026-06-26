@@ -12,312 +12,476 @@ public extension FormatRule {
     static let redundantBool = FormatRule(
         help:
         """
-        Removes redundant boolean comparisons. Transforms explicit comparisons with `true`/`false` into more concise boolean expressions.
-        **Transformations:**
-        - `== true` → remove comparison
-        - `== false` → add negation (`!`)
-        - `!= true` → add negation (`!`)
-        - `!= false` → remove comparison
+        Removes redundant comparisons with `true`/`false`, but only when the left-hand side is provably a non-optional `Bool`:
 
-        This rule safely handles optional Bool expressions and will not transform them to avoid compilation errors.
+        - A parenthesized boolean expression, e.g. `(a && b) == true` → `(a && b)`
+        - A `!`-negated expression, e.g. `!isReady == false` → `isReady`
+        - A name resolvable in the same file to a non-optional `Bool` — a local `let`/`var`, a function parameter, a `self` property, or a same-file method returning `Bool`.
 
-        This rule is the inverse of the opt-in `preferExplicitFalse` rule and is mutually exclusive with it — enable only one.
+        Anything whose type can't be resolved locally (members of other types, values from other files, complex inference) is left unchanged, since removing the comparison could fail to compile if the value is actually optional.
+
+        This rule is the inverse of `preferExplicitFalse` and is mutually exclusive with it — enable only one.
         """,
-        options: [],
-        sharedOptions: []
+        disabledByDefault: true
     ) { formatter in
-        // Properties and methods known to return optional values
-        // Using Sets for O(1) membership testing
-        let optionalReturningProperties: Set = ["last", "first"]
-        let optionalReturningMethods: Set = ["last", "first", "min", "max", "popLast", "popFirst", "randomElement"]
-
-        /// Helper: Check if token at index appears to be an optional-returning expression
-        func isOptionalExpression(beforeIndex: Int) -> Bool {
-            var checkIndex = beforeIndex
-
-            while let prevIndex = formatter.index(before: checkIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) {
-                let token = formatter.tokens[prevIndex]
-
-                // Explicit optional operators: ?, ??, etc.
-                if token == .operator("?", .postfix) ||
-                    token == .operator("?", .infix) ||
-                    token == .operator("??", .infix)
-                {
-                    return true
-                }
-
-                // Subscript access (dictionary/array)
-                if token == .endOfScope("]") {
-                    return true
-                }
-
-                // Known optional-returning properties
-                if token.isIdentifier, optionalReturningProperties.contains(token.string) {
-                    return true
-                }
-
-                // Known optional-returning methods
-                if token == .endOfScope(")"),
-                   let methodStartIndex = formatter.index(of: .startOfScope("("), before: prevIndex),
-                   let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier }),
-                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string)
-                {
-                    return true
-                }
-
-                checkIndex = prevIndex
-            }
-
-            return false
+        formatter.forEach(.operator("==", .infix)) { i, _ in
+            formatter.removeRedundantBoolComparison(at: i, isEqualityCheck: true)
         }
-
-        /// Helper: Check if identifier is a standalone backticked `true` or `false` variable
-        func isBacktickedBoolVariable(at index: Int) -> Bool {
-            let token = formatter.tokens[index]
-
-            guard token.isIdentifier,
-                  token.string.first == "`",
-                  token.string == "`true`" || token.string == "`false`"
-            else {
-                return false
-            }
-
-            // Check if it's a property (obj.`false`) - those are OK to transform
-            if let beforeIndex = formatter.index(before: index, where: { !$0.isSpaceOrCommentOrLinebreak }),
-               formatter.tokens[beforeIndex] == .operator(".", .infix)
-            {
-                return false // It's a property, not a standalone variable
-            }
-
-            return true // It's a standalone variable
-        }
-
-        /// Helper: Check if the expression is simple enough to safely transform
-        func isSimpleExpression(beforeIndex: Int) -> Bool {
-            guard let index = formatter.index(before: beforeIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) else {
-                return false
-            }
-
-            let token = formatter.tokens[index]
-
-            // Allow: identifiers, method calls, force unwraps
-            if token.isIdentifier || token == .endOfScope(")") || token == .operator("!", .postfix) {
-                // For method calls, check if it's an optional-returning method
-                if token == .endOfScope(")"),
-                   let methodStartIndex = formatter.index(of: .startOfScope("("), before: index),
-                   let methodNameIndex = formatter.index(before: methodStartIndex, where: { $0.isIdentifier }),
-                   optionalReturningMethods.contains(formatter.tokens[methodNameIndex].string)
-                {
-                    return false // Known optional-returning method
-                }
-                return true
-            }
-
-            return false
-        }
-
-        /// Helper: Find the start of the expression for negation placement
-        func findExpressionStart(beforeIndex: Int) -> Int {
-            var startIndex = beforeIndex
-
-            while let prevIndex = formatter.index(before: startIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) {
-                let token = formatter.tokens[prevIndex]
-
-                if token.isIdentifier ||
-                    token == .operator(".", .infix) ||
-                    token == .endOfScope(")") ||
-                    token == .operator("!", .postfix)
-                {
-                    startIndex = prevIndex
-
-                    // If we hit a closing paren, jump to the matching opening paren
-                    if token == .endOfScope(")"),
-                       let openParen = formatter.index(of: .startOfScope("("), before: prevIndex)
-                    {
-                        startIndex = openParen
-                    }
-                } else {
-                    break
-                }
-            }
-
-            return startIndex
-        }
-
-        /// Helper: Find the range to remove (including whitespace before operator)
-        func findRemovalRange(from operatorIndex: Int, to boolIndex: Int) -> ClosedRange<Int> {
-            var startIndex = operatorIndex
-
-            // Walk backwards to include all whitespace/comments/newlines before the operator
-            var checkIndex = operatorIndex
-            while let prevIndex = formatter.index(before: checkIndex, where: { _ in true }),
-                  formatter.tokens[prevIndex].isSpaceOrCommentOrLinebreak
-            {
-                startIndex = prevIndex
-                checkIndex = prevIndex
-            }
-
-            return startIndex ... boolIndex
-        }
-
-        formatter.forEachToken { i, token in
-            // Step 1: Check if this is a comparison operator (== or !=)
-            guard case let .operator(op, .infix) = token, op == "==" || op == "!=" else {
-                return
-            }
-
-            // Step 2: Check if the right side is a boolean literal (true or false)
-            guard let boolIndex = formatter.index(after: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
-                  case let .identifier(boolValue) = formatter.tokens[boolIndex],
-                  boolValue == "true" || boolValue == "false",
-                  boolValue.first != "`"
-            else { // Skip backticked identifiers
-                return
-            }
-
-            // Step 3: Skip if the left side appears to return an optional
-            guard !isOptionalExpression(beforeIndex: i) else {
-                return
-            }
-
-            // Step 4: Skip if the left side is a backticked variable named `true` or `false`
-            guard let beforeIndex = formatter.index(before: i, where: { !$0.isSpaceOrCommentOrLinebreak }),
-                  !isBacktickedBoolVariable(at: beforeIndex)
-            else {
-                return
-            }
-
-            // Step 5: Skip if the expression is too complex to safely transform
-            guard isSimpleExpression(beforeIndex: i) else {
-                return
-            }
-
-            // Step 6: Find where to place the negation operator (if needed)
-            let expressionStart = findExpressionStart(beforeIndex: i)
-
-            // Step 7: Find the range to remove (operator and boolean literal)
-            let removalRange = findRemovalRange(from: i, to: boolIndex)
-
-            // Step 8: Apply the transformation based on operator and boolean value
-            if boolValue == "true" {
-                if op == "==" {
-                    // `expr == true` → `expr`
-                    formatter.removeTokens(in: removalRange)
-                } else {
-                    // `expr != true` → `!expr`
-                    formatter.removeTokens(in: removalRange)
-                    formatter.insert(.operator("!", .prefix), at: expressionStart)
-                }
-            } else { // boolValue == "false"
-                if op == "==" {
-                    // `expr == false` → `!expr`
-                    formatter.removeTokens(in: removalRange)
-                    formatter.insert(.operator("!", .prefix), at: expressionStart)
-                } else {
-                    // `expr != false` → `expr`
-                    formatter.removeTokens(in: removalRange)
-                }
-            }
+        formatter.forEach(.operator("!=", .infix)) { i, _ in
+            formatter.removeRedundantBoolComparison(at: i, isEqualityCheck: false)
         }
     } examples: {
         """
-        **Basic comparisons:**
-
         ```diff
-        - if isEnabled == true { print("On") }
-        + if isEnabled { print("On") }
+        - if (a && b) == true {
+        + if (a && b) {
 
-        - if isDisabled == false { print("Off") }
-        + if !isDisabled { print("Off") }
-
-        - if isOnline != true { print("Offline") }
-        + if !isOnline { print("Offline") }
-
-        - if isReady != false { print("Ready") }
-        + if isReady { print("Ready") }
+        - if !isReady == false {
+        + if isReady {
         ```
 
-        **Control flow statements:**
-
         ```diff
-        - while running == true { doWork() }
-        + while running { doWork() }
-
-        - guard status == false else { return }
-        + guard !status else { return }
-
-        - for item in items where item.isValid == true { }
-        + for item in items where item.isValid { }
+          func handle(isEnabled: Bool) {
+        -     if isEnabled == true {
+        +     if isEnabled {
+          }
         ```
 
-        **Assignments and expressions:**
-
-        ```diff
-        - let isActive = userLoggedIn == true
-        + let isActive = userLoggedIn
-
-        - let isInactive = userLoggedIn == false  
-        + let isInactive = !userLoggedIn
-
-        - return isComplete == true
-        + return isComplete
-
-        - let status = isOnline == true ? "Online" : "Offline"
-        + let status = isOnline ? "Online" : "Offline"
-        ```
-
-        **Property and method calls:**
-
-        ```diff
-        - if obj.property.isEnabled == true { }
-        + if obj.property.isEnabled { }
-
-        - if validator.check(input) == false { }
-        + if !validator.check(input) { }
-
-        - if MyClass.isFeatureEnabled == true { }
-        + if MyClass.isFeatureEnabled { }
-        ```
-
-        **Multiple conditions:**
-
-        ```diff
-        - if isReady == true && isComplete == true { }
-        + if isReady && isComplete { }
-
-        - if isReady == false || isComplete == false { }
-        + if !isReady || !isComplete { }
-        ```
-
-        **✅ Force unwrapped optionals ARE transformed (returns non-optional Bool):**
-
-        ```diff
-        - if optional! == true { }
-        + if optional! { }
-
-        - if optional! == false { }
-        + if !optional! { }
-        ```
-
-        **❌ These cases are NOT modified (optional Bool expressions):**
+        These are **not** modified, because the left-hand side can't be proven to
+        be a non-optional `Bool` from the current file:
 
         ```swift
-        // Optional chaining - returns Bool?
-        if user?.isActive == true { }
-        if profile?.settings?.isPublic != false { }
-
-        // Array/Dictionary access - returns Bool?
-        if flags["enabled"] == true { }
-        if boolArray[0] != false { }
-
-        // Optional-returning properties/methods - returns Bool?
-        if collection.last == true { }
-        if collection.first != false { }
-        if values.min() == true { }
-
-        // Nil coalescing with optionals
-        if (user?.isActive ?? false) == true { }
+        if otherObject.isActive == true {}  // member of another type
+        if importedValue == true {}         // declared in another file
+        if value! == true {}                // force-unwrap
+        if dict[key] == true {}             // subscript
+        if user?.isActive == true {}        // optional
         ```
         """
+    }
+}
+
+// MARK: - Helpers
+
+extension Formatter {
+    /// Operators whose result is always a (non-optional) `Bool`.
+    static let boolResultOperators: Set<String> = [
+        "==", "!=", "===", "!==", "~=", "<", ">", "<=", ">=", "&&", "||",
+    ]
+
+    /// Removes a redundant `== true` / `== false` / `!= true` / `!= false`
+    /// comparison at `operatorIndex`, inserting a `!` negation where needed.
+    func removeRedundantBoolComparison(at operatorIndex: Int, isEqualityCheck: Bool) {
+        // The right side must be a `true` or `false` literal (a backticked
+        // `` `true` `` identifier has a different string and is ignored here).
+        guard let boolIndex = index(after: operatorIndex, where: { !$0.isSpaceOrCommentOrLinebreak }),
+              case let .identifier(boolValue) = tokens[boolIndex],
+              boolValue == "true" || boolValue == "false"
+        else {
+            return
+        }
+
+        // Only transform when the left side is provably a non-optional Bool.
+        guard isProvableBoolExpression(before: operatorIndex) else {
+            return
+        }
+
+        // `== true` / `!= false` simply drop the comparison; `== false` / `!= true`
+        // require negating the operand.
+        let shouldNegate = (boolValue == "false") == isEqualityCheck
+
+        // Don't remove comments that sit between the operand and the literal.
+        let removalRange = boolComparisonRemovalRange(from: operatorIndex, to: boolIndex)
+        guard !tokens[removalRange].contains(where: \.isComment) else {
+            return
+        }
+
+        guard shouldNegate else {
+            removeTokens(in: removalRange)
+            return
+        }
+
+        // If the operand already has a leading prefix `!`, collapse it instead of
+        // inserting a second one (avoids `!!`).
+        let expressionStart = boolExpressionStart(before: operatorIndex)
+        let existingNegation = index(before: expressionStart, where: { !$0.isSpaceOrCommentOrLinebreak })
+            .flatMap { tokens[$0] == .operator("!", .prefix) ? $0 : nil }
+
+        removeTokens(in: removalRange)
+        if let existingNegation {
+            removeToken(at: existingNegation)
+        } else {
+            insert(.operator("!", .prefix), at: expressionStart)
+        }
+    }
+
+    /// Whether the operand ending just before `index` is provably a non-optional
+    /// `Bool`: a `!`-negation, a parenthesized boolean expression, or a name that
+    /// resolves in the same file to a non-optional `Bool`.
+    func isProvableBoolExpression(before index: Int) -> Bool {
+        // 1. A `!`-prefixed operand is always Bool (the `!` operator requires Bool).
+        let start = boolExpressionStart(before: index)
+        if let beforeStart = self.index(before: start, where: { !$0.isSpaceOrCommentOrLinebreak }),
+           tokens[beforeStart] == .operator("!", .prefix)
+        {
+            return true
+        }
+
+        // 2. A parenthesized boolean expression, e.g. `(a && b)` or `(x < y)`.
+        if let closeParen = self.index(before: index, where: { !$0.isSpaceOrCommentOrLinebreak }),
+           tokens[closeParen] == .endOfScope(")"),
+           let openParen = indexOfOpeningParen(closing: closeParen),
+           isGroupingParen(at: openParen),
+           parenthesizedExpressionIsBool(from: openParen, to: closeParen)
+        {
+            return true
+        }
+
+        // 3. A name / call / `self` member resolvable to a non-optional Bool.
+        return operandResolvesToBool(before: index)
+    }
+
+    /// The index of the `(` matching the `)` at `closeParen`.
+    func indexOfOpeningParen(closing closeParen: Int) -> Int? {
+        guard tokens[closeParen] == .endOfScope(")") else { return nil }
+        var depth = 0
+        var current = closeParen
+        while let prev = index(before: current, where: { _ in true }) {
+            switch tokens[prev] {
+            case .endOfScope(")"):
+                depth += 1
+            case .startOfScope("("):
+                if depth == 0 { return prev }
+                depth -= 1
+            default:
+                break
+            }
+            current = prev
+        }
+        return nil
+    }
+
+    /// Whether the `(` at `index` starts a grouping expression rather than a
+    /// call or subscript argument list.
+    func isGroupingParen(at index: Int) -> Bool {
+        guard let prevIndex = self.index(before: index, where: { !$0.isSpaceOrCommentOrLinebreak }) else {
+            return true
+        }
+        let token = tokens[prevIndex]
+        return !(token.isIdentifier
+            || token == .endOfScope(")")
+            || token == .endOfScope("]")
+            || token == .operator("?", .postfix)
+            || token == .operator("!", .postfix))
+    }
+
+    /// Whether the expression between `openParen` and `closeParen` has a
+    /// top-level operator that yields a `Bool` (a comparison/logical operator,
+    /// a `!` negation, or an `is` check).
+    func parenthesizedExpressionIsBool(from openParen: Int, to closeParen: Int) -> Bool {
+        var depth = 0
+        var current = openParen
+        while let next = index(after: current, where: { _ in true }), next < closeParen {
+            let token = tokens[next]
+            if token.isStartOfScope {
+                depth += 1
+            } else if token.isEndOfScope {
+                depth -= 1
+            } else if depth == 0 {
+                if case let .operator(op, .infix) = token, Self.boolResultOperators.contains(op) {
+                    return true
+                }
+                if token == .operator("!", .prefix) || token == .keyword("is") {
+                    return true
+                }
+            }
+            current = next
+        }
+        return false
+    }
+
+    /// Finds the start of the operand before `index`, so a `!` negation can be
+    /// placed in front of the whole expression.
+    func boolExpressionStart(before index: Int) -> Int {
+        var startIndex = index
+
+        while let prevIndex = self.index(before: startIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) {
+            let token = tokens[prevIndex]
+
+            guard token.isIdentifier ||
+                token == .operator(".", .infix) ||
+                token == .endOfScope(")") ||
+                token == .operator("!", .postfix)
+            else {
+                break
+            }
+
+            startIndex = prevIndex
+
+            // Jump over a parenthesized group to its matching opening paren.
+            if token == .endOfScope(")"), let openParen = indexOfOpeningParen(closing: prevIndex) {
+                startIndex = openParen
+            }
+        }
+
+        return startIndex
+    }
+
+    /// The range to remove for a comparison: the operator, the boolean literal,
+    /// and any whitespace immediately before the operator.
+    func boolComparisonRemovalRange(from operatorIndex: Int, to boolIndex: Int) -> ClosedRange<Int> {
+        var startIndex = operatorIndex
+
+        while let prevIndex = index(before: startIndex, where: { _ in true }),
+              tokens[prevIndex].isSpaceOrCommentOrLinebreak
+        {
+            startIndex = prevIndex
+        }
+
+        return startIndex ... boolIndex
+    }
+
+    // MARK: Local type resolution
+
+    /// Whether the operand ending just before `operatorIndex` is a simple name,
+    /// `self` property, or function call that resolves in the same file to a
+    /// non-optional `Bool`.
+    func operandResolvesToBool(before operatorIndex: Int) -> Bool {
+        guard let operandEnd = index(before: operatorIndex, where: { !$0.isSpaceOrCommentOrLinebreak }) else {
+            return false
+        }
+
+        // Call: `name(...)` or `self.name(...)`.
+        if tokens[operandEnd] == .endOfScope(")") {
+            guard let openParen = indexOfOpeningParen(closing: operandEnd),
+                  let nameIndex = index(before: openParen, where: { !$0.isSpaceOrCommentOrLinebreak }),
+                  tokens[nameIndex].isIdentifier
+            else {
+                return false
+            }
+            let name = tokens[nameIndex].string
+            switch qualifier(before: nameIndex) {
+            case .none, .selfMember:
+                return enclosingTypeFunctionReturnsBool(name, at: operatorIndex)
+                    && !hasLocalBinding(of: name, at: operatorIndex)
+            case .other:
+                return false
+            }
+        }
+
+        // Identifier: `name` or `self.name`.
+        guard tokens[operandEnd].isIdentifier else { return false }
+        let name = tokens[operandEnd].string
+        switch qualifier(before: operandEnd) {
+        case .none:
+            return bareNameResolvesToBool(name, at: operandEnd)
+        case .selfMember:
+            return enclosingTypePropertyIsBool(name, at: operatorIndex)
+        case .other:
+            return false
+        }
+    }
+
+    enum OperandQualifier {
+        /// No qualifier — a bare `name`.
+        case none
+        /// `self.name`.
+        case selfMember
+        /// `obj.name`, `a.b.name`, etc. — not locally resolvable.
+        case other
+    }
+
+    /// Classifies what precedes the identifier at `nameIndex`.
+    func qualifier(before nameIndex: Int) -> OperandQualifier {
+        guard let dotIndex = index(before: nameIndex, where: { !$0.isSpaceOrCommentOrLinebreak }),
+              tokens[dotIndex] == .operator(".", .infix)
+        else {
+            return .none
+        }
+        guard let baseIndex = index(before: dotIndex, where: { !$0.isSpaceOrCommentOrLinebreak }),
+              tokens[baseIndex] == .identifier("self"),
+              // `self` must itself be unqualified (not `foo.self`).
+              index(before: baseIndex, where: { !$0.isSpaceOrCommentOrLinebreak })
+              .map({ tokens[$0] != .operator(".", .infix) }) ?? true
+        else {
+            return .other
+        }
+        return .selfMember
+    }
+
+    /// Whether the type is written as exactly `Bool` (non-optional).
+    func isExactlyBool(_ type: TypeName?) -> Bool {
+        guard let type, !type.isOptionalType else { return false }
+        return type.withoutParens().string == "Bool"
+    }
+
+    /// Whether the property at `introducerIndex` (a `let`/`var`) is a
+    /// non-optional `Bool` — by annotation, or by a `true`/`false` initializer.
+    func propertyIsBool(atIntroducerIndex introducerIndex: Int) -> Bool {
+        guard let property = parsePropertyDeclaration(atIntroducerIndex: introducerIndex) else {
+            return false
+        }
+        if let type = property.type {
+            return isExactlyBool(type)
+        }
+        if let value = property.value {
+            return isBoolLiteral(in: value.expressionRange)
+        }
+        return false
+    }
+
+    /// Whether `range` contains exactly a single `true`/`false` literal.
+    func isBoolLiteral(in range: ClosedRange<Int>) -> Bool {
+        guard let first = index(of: .nonSpaceOrCommentOrLinebreak, in: Range(range)),
+              let last = index(of: .nonSpaceOrCommentOrLinebreak, before: range.upperBound + 1),
+              first == last,
+              case let .identifier(value) = tokens[first],
+              value == "true" || value == "false"
+        else {
+            return false
+        }
+        return true
+    }
+
+    /// Whether a property named `name` of the enclosing type is a non-optional
+    /// `Bool` (and every same-named property is, if there are several).
+    func enclosingTypePropertyIsBool(_ name: String, at index: Int) -> Bool {
+        guard let type = parseEnclosingType(containing: index) else { return false }
+        let properties = type.body.filter { ($0.keyword == "let" || $0.keyword == "var") && $0.name == name }
+        guard !properties.isEmpty else { return false }
+        return properties.allSatisfy { propertyIsBool(atIntroducerIndex: $0.keywordIndex) }
+    }
+
+    /// Whether every same-named method of the enclosing type returns `Bool`.
+    func enclosingTypeFunctionReturnsBool(_ name: String, at index: Int) -> Bool {
+        guard let type = parseEnclosingType(containing: index) else { return false }
+        let functions = type.body.filter { $0.keyword == "func" && $0.name == name }
+        guard !functions.isEmpty else { return false }
+        return functions.allSatisfy {
+            guard let function = parseFunctionDeclaration(keywordIndex: $0.keywordIndex) else { return false }
+            return isExactlyBool(function.returnType)
+        }
+    }
+
+    /// Resolves a bare identifier `name` to a non-optional `Bool`. Considers
+    /// function parameters and local `let`/`var` bindings; if any binding of
+    /// `name` can't be proven to be exactly `Bool`, returns `false` (skip).
+    /// With no local binding, resolves `name` as a property of the enclosing type.
+    func bareNameResolvesToBool(_ name: String, at useIndex: Int) -> Bool {
+        let functions = enclosingFunctions(at: useIndex)
+        var foundBoolBinding = false
+
+        for function in functions {
+            for argument in function.arguments where argument.internalLabel == name {
+                if isExactlyBool(argument.type) { foundBoolBinding = true } else { return false }
+            }
+        }
+
+        // Scan the outermost enclosing function body (which contains all nested
+        // scopes) for any binding of `name`. Conservatively bail on any binding
+        // that isn't a plainly-typed `Bool`.
+        if let body = functions.last?.bodyRange {
+            for i in body {
+                switch tokens[i] {
+                case .keyword("let"), .keyword("var"):
+                    if namesInDeclaration(at: i)?.contains(name) == true {
+                        if parsePropertyDeclaration(atIntroducerIndex: i)?.identifier == name,
+                           propertyIsBool(atIntroducerIndex: i)
+                        {
+                            foundBoolBinding = true
+                        } else {
+                            return false
+                        }
+                    }
+                case .keyword("for"):
+                    if forLoopBinds(name, at: i) { return false }
+                case .startOfScope("{"):
+                    if isStartOfClosureOrFunctionBody(at: i), closureBinds(name, scopeStart: i) {
+                        return false
+                    }
+                default:
+                    break
+                }
+            }
+        }
+
+        if foundBoolBinding { return true }
+        return enclosingTypePropertyIsBool(name, at: useIndex)
+    }
+
+    /// Whether `name` has any local binding (parameter, `let`/`var`, `for`, or
+    /// closure parameter) in the enclosing function — used to detect that a bare
+    /// call would actually be a local closure, not a method.
+    func hasLocalBinding(of name: String, at useIndex: Int) -> Bool {
+        let functions = enclosingFunctions(at: useIndex)
+        for function in functions where function.arguments.contains(where: { $0.internalLabel == name }) {
+            return true
+        }
+        guard let body = functions.last?.bodyRange else { return false }
+        for i in body {
+            switch tokens[i] {
+            case .keyword("let"), .keyword("var"):
+                if namesInDeclaration(at: i)?.contains(name) == true { return true }
+            case .keyword("for"):
+                if forLoopBinds(name, at: i) { return true }
+            case .startOfScope("{"):
+                if isStartOfClosureOrFunctionBody(at: i), closureBinds(name, scopeStart: i) { return true }
+            default:
+                break
+            }
+        }
+        return false
+    }
+
+    /// The enclosing function/initializer/subscript declarations of `index`,
+    /// innermost first.
+    func enclosingFunctions(at index: Int) -> [FunctionDeclaration] {
+        var result: [FunctionDeclaration] = []
+        var current = index
+        while let scopeStart = startOfScope(at: current) {
+            if tokens[scopeStart] == .startOfScope("{"),
+               let ownerIndex = indexOfLastSignificantKeyword(at: scopeStart, excluding: ["where"]),
+               ["func", "init", "subscript"].contains(tokens[ownerIndex].string),
+               let function = parseFunctionDeclaration(keywordIndex: ownerIndex),
+               function.bodyRange?.lowerBound == scopeStart
+            {
+                result.append(function)
+            }
+            current = scopeStart
+        }
+        return result
+    }
+
+    /// Whether a `for` clause at `forIndex` binds `name` (between `for` and its
+    /// `in` / body).
+    func forLoopBinds(_ name: String, at forIndex: Int) -> Bool {
+        var current = forIndex
+        while let next = index(after: current, where: { _ in true }) {
+            let token = tokens[next]
+            if token == .keyword("in") || token == .startOfScope("{") { return false }
+            if token == .identifier(name) { return true }
+            current = next
+        }
+        return false
+    }
+
+    /// Whether the closure starting at `scopeStart` binds `name` in its
+    /// parameter / capture list (before its `in`).
+    func closureBinds(_ name: String, scopeStart: Int) -> Bool {
+        var depth = 0
+        var current = scopeStart
+        while let next = index(after: current, where: { _ in true }) {
+            let token = tokens[next]
+            if token.isStartOfScope {
+                depth += 1
+            } else if token.isEndOfScope {
+                if depth == 0 { return false }
+                depth -= 1
+            } else if depth == 0, token == .keyword("in") {
+                return tokens[(scopeStart + 1) ..< next].contains(.identifier(name))
+            }
+            current = next
+        }
+        return false
     }
 }

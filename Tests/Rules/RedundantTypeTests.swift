@@ -696,7 +696,7 @@ final class RedundantTypeTests: XCTestCase {
         if check == true, let foo: Foo = Foo() {}
         """
         let options = FormatOptions(propertyTypes: .explicit)
-        testFormatting(for: input, rule: .redundantType, options: options, exclude: [.propertyTypes, .redundantBool])
+        testFormatting(for: input, rule: .redundantType, options: options, exclude: [.propertyTypes])
     }
 
     func testRedundantTypeWorksAfterIf() {
