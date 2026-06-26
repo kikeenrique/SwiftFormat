@@ -21,7 +21,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             print("false")
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testGuardNegation() {
@@ -32,7 +32,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         guard array.isEmpty == false else { return }
         """
         testFormatting(for: input, output, rule: .preferExplicitFalse,
-                       exclude: [.wrapConditionalBodies])
+                       exclude: [.wrapConditionalBodies, .redundantBool])
     }
 
     func testWhileNegation() {
@@ -46,7 +46,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             doWork()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testPropertyNegation() {
@@ -60,7 +60,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             view.show()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testFunctionCallNegation() {
@@ -74,7 +74,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             handleFalse()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testMethodCallNegation() {
@@ -88,7 +88,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             addValue(value)
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testParenthesizedExpressionNegation() {
@@ -102,7 +102,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             handleBothFalse()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testComplexExpressionNegation() {
@@ -116,7 +116,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             handleComplexFalse()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNestedPropertyNegation() {
@@ -131,7 +131,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         }
         """
         testFormatting(for: input, output, rule: .preferExplicitFalse,
-                       exclude: [.redundantSelf])
+                       exclude: [.redundantSelf, .redundantBool])
     }
 
     func testChainedMethodCallNegation() {
@@ -145,7 +145,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             handleChainedFalse()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testMultipleNegationsInSameLine() {
@@ -160,7 +160,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         }
         """
         testFormatting(for: input, output, rule: .preferExplicitFalse,
-                       exclude: [.andOperator])
+                       exclude: [.andOperator, .redundantBool])
     }
 
     func testNegationInTernary() {
@@ -170,7 +170,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         let output = """
         let result = condition == false ? "false" : "true"
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInReturnStatement() {
@@ -184,7 +184,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             return isValid == false
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInAssignment() {
@@ -194,7 +194,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         let output = """
         let isFalse = someCondition == false
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInFunctionParameter() {
@@ -204,7 +204,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         let output = """
         processData(data: isProcessed == false)
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationWithComments() {
@@ -218,7 +218,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             doSomething()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNoChangeForPostfixNot() {
@@ -243,7 +243,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             doSomething()
         }
         """
-        testFormatting(for: input, rule: .preferExplicitFalse)
+        testFormatting(for: input, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNoChangeForExistingEqualTrue() {
@@ -252,7 +252,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             doSomething()
         }
         """
-        testFormatting(for: input, rule: .preferExplicitFalse)
+        testFormatting(for: input, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNoChangeForOptionalBool() {
@@ -296,7 +296,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             handleInvalidFoo()
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInClosure() {
@@ -316,7 +316,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             return true
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.wrapFunctionBodies])
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.wrapFunctionBodies, .redundantBool])
     }
 
     func testNegationInSwitchCase() {
@@ -336,7 +336,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             break
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInWhereClause() {
@@ -350,7 +350,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             process(item)
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInComputedProperty() {
@@ -364,7 +364,7 @@ final class PreferExplicitFalseTests: XCTestCase {
             return items.isEmpty == false
         }
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInArrayLiteral() {
@@ -374,7 +374,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         let output = """
         let array = [a == false, b == false, c == false]
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testNegationInDictionaryLiteral() {
@@ -384,7 +384,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         let output = """
         let dict = ["a": value == false, "b": other == false]
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testClosureArgumentNegation() {
@@ -394,7 +394,7 @@ final class PreferExplicitFalseTests: XCTestCase {
         let output = """
         let result = items.contains(where: { $0.isValid }) == false
         """
-        testFormatting(for: input, output, rule: .preferExplicitFalse)
+        testFormatting(for: input, output, rule: .preferExplicitFalse, exclude: [.redundantBool])
     }
 
     func testTrailingClosureNegation() {
