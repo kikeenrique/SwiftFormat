@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class ExtensionAccessControlTests: XCTestCase {
+final class ExtensionAccessControlTests: XCTestCase {
     func testUpdatesVisibilityOfExtensionMembers() {
         let input = """
         private extension Foo {
@@ -36,7 +36,7 @@ class ExtensionAccessControlTests: XCTestCase {
         testFormatting(
             for: input, output, rule: .extensionAccessControl,
             options: FormatOptions(extensionACLPlacement: .onDeclarations),
-            exclude: [.redundantInternal]
+            exclude: [.redundantInternal, .wrapPropertyBodies]
         )
     }
 
@@ -59,7 +59,8 @@ class ExtensionAccessControlTests: XCTestCase {
 
         testFormatting(
             for: input, output, rule: .extensionAccessControl,
-            options: FormatOptions(extensionACLPlacement: .onDeclarations)
+            options: FormatOptions(extensionACLPlacement: .onDeclarations),
+            exclude: [.wrapPropertyBodies]
         )
     }
 
@@ -82,7 +83,8 @@ class ExtensionAccessControlTests: XCTestCase {
 
         testFormatting(
             for: input, output, rule: .extensionAccessControl,
-            options: FormatOptions(extensionACLPlacement: .onDeclarations)
+            options: FormatOptions(extensionACLPlacement: .onDeclarations),
+            exclude: [.wrapPropertyBodies]
         )
     }
 
@@ -107,7 +109,8 @@ class ExtensionAccessControlTests: XCTestCase {
 
         testFormatting(
             for: input, output, rule: .extensionAccessControl,
-            options: FormatOptions(extensionACLPlacement: .onDeclarations)
+            options: FormatOptions(extensionACLPlacement: .onDeclarations),
+            exclude: [.wrapPropertyBodies]
         )
     }
 
@@ -159,7 +162,8 @@ class ExtensionAccessControlTests: XCTestCase {
 
         testFormatting(
             for: input, output, rule: .extensionAccessControl,
-            options: FormatOptions(extensionACLPlacement: .onDeclarations)
+            options: FormatOptions(extensionACLPlacement: .onDeclarations),
+            exclude: [.wrapFunctionBodies]
         )
     }
 
@@ -212,7 +216,7 @@ class ExtensionAccessControlTests: XCTestCase {
         }
         """
 
-        testFormatting(for: input, output, rule: .extensionAccessControl)
+        testFormatting(for: input, output, rule: .extensionAccessControl, exclude: [.wrapPropertyBodies])
     }
 
     func testUpdatedVisibilityOfExtensionWithDeclarationsInConditionalCompilation() {
@@ -234,7 +238,7 @@ class ExtensionAccessControlTests: XCTestCase {
         }
         """
 
-        testFormatting(for: input, output, rule: .extensionAccessControl)
+        testFormatting(for: input, output, rule: .extensionAccessControl, exclude: [.wrapPropertyBodies])
     }
 
     func testDoesntUpdateExtensionVisibilityWithoutMajorityBodyVisibility() {
@@ -247,7 +251,7 @@ class ExtensionAccessControlTests: XCTestCase {
         }
         """
 
-        testFormatting(for: input, rule: .extensionAccessControl)
+        testFormatting(for: input, rule: .extensionAccessControl, exclude: [.wrapPropertyBodies])
     }
 
     func testUpdateExtensionVisibilityWithMajorityBodyVisibility() {
@@ -269,7 +273,7 @@ class ExtensionAccessControlTests: XCTestCase {
         }
         """
 
-        testFormatting(for: input, output, rule: .extensionAccessControl)
+        testFormatting(for: input, output, rule: .extensionAccessControl, exclude: [.wrapPropertyBodies])
     }
 
     func testDoesntUpdateExtensionVisibilityWhenMajorityBodyVisibilityIsntMostVisible() {
@@ -281,7 +285,7 @@ class ExtensionAccessControlTests: XCTestCase {
         }
         """
 
-        testFormatting(for: input, rule: .extensionAccessControl)
+        testFormatting(for: input, rule: .extensionAccessControl, exclude: [.wrapPropertyBodies])
     }
 
     func testDoesntUpdateExtensionVisibilityWithInternalDeclarations() {
@@ -292,7 +296,7 @@ class ExtensionAccessControlTests: XCTestCase {
         }
         """
 
-        testFormatting(for: input, rule: .extensionAccessControl)
+        testFormatting(for: input, rule: .extensionAccessControl, exclude: [.wrapPropertyBodies])
     }
 
     func testDoesntUpdateExtensionThatAlreadyHasCorrectVisibilityKeyword() {
@@ -443,7 +447,59 @@ class ExtensionAccessControlTests: XCTestCase {
             public func bar() {}
         }
         """
-        testFormatting(for: input, rule: .extensionAccessControl)
+        testFormatting(for: input, rule: .extensionAccessControl, exclude: [.redundantPublic])
+    }
+
+    func testAccessNotHoistedIfNestedTypeVisibilityIsLower() {
+        // Extension of a dot-separated nested type whose inner type is internal.
+        // SwiftFormat must not hoist `public` onto the extension because the type is internal.
+        let input = """
+        extension CategorySurface {
+            struct RetailerItemGroup: Hashable {
+                let collection: String
+            }
+        }
+
+        extension CategorySurface.RetailerItemGroup {
+            public static func placeholder(id: String) -> Self {
+                .init(collection: id)
+            }
+        }
+        """
+        testFormatting(for: input, rule: .extensionAccessControl, exclude: [.redundantPublic])
+    }
+
+    func testAccessHoistedForPublicNestedType() {
+        // Extension of a dot-separated nested type that IS public should still allow hoisting.
+        let input = """
+        extension CategorySurface {
+            public struct RetailerItemGroup: Hashable {
+                let collection: String
+            }
+        }
+
+        extension CategorySurface.RetailerItemGroup {
+            public static func placeholder(id: String) -> Self {
+                .init(collection: id)
+            }
+        }
+        """
+        // `public` is hoisted from `public struct RetailerItemGroup` to `public extension CategorySurface`,
+        // and from `public static func placeholder` to `public extension CategorySurface.RetailerItemGroup`.
+        let output = """
+        public extension CategorySurface {
+            struct RetailerItemGroup: Hashable {
+                let collection: String
+            }
+        }
+
+        public extension CategorySurface.RetailerItemGroup {
+            static func placeholder(id: String) -> Self {
+                .init(collection: id)
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .extensionAccessControl)
     }
 
     func testExtensionAccessControlRuleTerminatesInFileWithConditionalCompilation() {

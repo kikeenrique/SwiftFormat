@@ -34,11 +34,11 @@ import Foundation
 // https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/LexicalStructure.html
 
 /// Used to speed up matching
-// Note: Any, Self, self, super, nil, true and false have been omitted deliberately, as they
+/// Note: Any, Self, self, super, nil, true and false have been omitted deliberately, as they
 /// behave like identifiers. So too have context-specific keywords such as the following:
 /// any, associativity, async, convenience, didSet, dynamic, final, get, indirect, infix, lazy,
 /// left, mutating, none, nonmutating, open, optional, override, postfix, precedence,
-/// prefix, Protocol, required, right, set, some, any, Type, unowned, weak, willSet
+/// prefix, Protocol, required, right, set, some, any, of, Type, unowned, weak, willSet
 let swiftKeywords = Set([
     "let", "return", "func", "var", "if", "public", "as", "else", "in", "import",
     "class", "try", "guard", "case", "for", "init", "extension", "private", "static",
@@ -53,6 +53,31 @@ public extension String {
     /// Is this string a reserved keyword in Swift?
     var isSwiftKeyword: Bool {
         swiftKeywords.contains(self)
+    }
+
+    /// Is a keyword when used in a type position?
+    var isKeywordInTypeContext: Bool {
+        ["borrowing", "consuming", "isolated", "sending", "some", "any", "of"].contains(self)
+    }
+
+    /// Is this a macro name or conditional compilation directive?
+    var isMacroOrCompilerDirective: Bool {
+        hasPrefix("#")
+    }
+
+    /// Is this a macro name?
+    var isMacro: Bool {
+        isMacroOrCompilerDirective && !["#if", "#elseif", "#else", "#endif"].contains(self)
+    }
+
+    /// Is this an attribute name?
+    var isAttribute: Bool {
+        hasPrefix("@")
+    }
+
+    /// Is this a macro name or conditional compilation directive?
+    var isMacroOrAttribute: Bool {
+        isMacro || isAttribute
     }
 
     /// Is this string a valid operator?
@@ -377,27 +402,96 @@ public extension Token {
         }
     }
 
-    var isAttribute: Bool { isKeywordOrAttribute && string.hasPrefix("@") }
-    var isDelimiter: Bool { hasType(of: .delimiter("")) }
-    var isOperator: Bool { hasType(of: .operator("", .none)) }
-    var isUnwrapOperator: Bool { isOperator("?", .postfix) || isOperator("!", .postfix) }
-    var isRangeOperator: Bool { isOperator("...") || isOperator("..<") }
-    var isNumber: Bool { hasType(of: .number("", .integer)) }
-    var isError: Bool { hasType(of: .error("")) }
-    var isStartOfScope: Bool { hasType(of: .startOfScope("")) }
-    var isEndOfScope: Bool { hasType(of: .endOfScope("")) }
-    var isKeyword: Bool { isKeywordOrAttribute && !string.hasPrefix("@") }
-    var isKeywordOrAttribute: Bool { hasType(of: .keyword("")) }
-    var isIdentifier: Bool { hasType(of: .identifier("")) }
-    var isIdentifierOrKeyword: Bool { isIdentifier || isKeywordOrAttribute }
-    var isSpace: Bool { hasType(of: .space("")) }
-    var isLinebreak: Bool { hasType(of: .linebreak("", 0)) }
-    var isEndOfStatement: Bool { self == .delimiter(";") || isLinebreak }
-    var isSpaceOrLinebreak: Bool { isSpace || isLinebreak }
-    var isSpaceOrComment: Bool { isSpace || isComment }
-    var isSpaceOrCommentOrLinebreak: Bool { isSpaceOrComment || isLinebreak }
-    var isNonSpaceOrCommentOrLinebreak: Bool { !isSpaceOrCommentOrLinebreak }
-    var isCommentOrLinebreak: Bool { isComment || isLinebreak }
+    var isAttribute: Bool {
+        isKeywordOrAttribute && string.isAttribute
+    }
+
+    var isDelimiter: Bool {
+        hasType(of: .delimiter(""))
+    }
+
+    var isOperator: Bool {
+        hasType(of: .operator("", .none))
+    }
+
+    var isUnwrapOperator: Bool {
+        isOperator("?", .postfix) || isOperator("!", .postfix)
+    }
+
+    var isRangeOperator: Bool {
+        isOperator("...") || isOperator("..<")
+    }
+
+    var isNumber: Bool {
+        hasType(of: .number("", .integer))
+    }
+
+    var isError: Bool {
+        hasType(of: .error(""))
+    }
+
+    var isStartOfScope: Bool {
+        hasType(of: .startOfScope(""))
+    }
+
+    var isEndOfScope: Bool {
+        hasType(of: .endOfScope(""))
+    }
+
+    var isKeyword: Bool {
+        isKeywordOrAttribute && !string.isAttribute
+    }
+
+    var isKeywordOrAttribute: Bool {
+        hasType(of: .keyword(""))
+    }
+
+    var isIdentifier: Bool {
+        hasType(of: .identifier(""))
+    }
+
+    var isIdentifierOrKeyword: Bool {
+        isIdentifier || isKeywordOrAttribute
+    }
+
+    var isSpace: Bool {
+        hasType(of: .space(""))
+    }
+
+    var isLinebreak: Bool {
+        hasType(of: .linebreak("", 0))
+    }
+
+    var isEndOfStatement: Bool {
+        self == .delimiter(";") || isLinebreak
+    }
+
+    var isSpaceOrLinebreak: Bool {
+        isSpace || isLinebreak
+    }
+
+    var isSpaceOrComment: Bool {
+        isSpace || isComment
+    }
+
+    var isSpaceOrCommentOrLinebreak: Bool {
+        isSpaceOrComment || isLinebreak
+    }
+
+    var isNonSpaceOrCommentOrLinebreak: Bool {
+        !isSpaceOrCommentOrLinebreak
+    }
+
+    var isCommentOrLinebreak: Bool {
+        isComment || isLinebreak
+    }
+
+    var isMacro: Bool {
+        if case let .keyword(string) = self {
+            return string.isMacro
+        }
+        return false
+    }
 
     var isSwitchCaseOrDefault: Bool {
         if case let .endOfScope(string) = self {
@@ -533,8 +627,8 @@ extension Token {
              .endOfScope("}"), .endOfScope(">"),
              .endOfScope where isStringDelimiter:
             return true
-        case let .keyword(name) where name.hasPrefix("#"):
-            return true
+        case let .keyword(name):
+            return name.isMacroOrCompilerDirective
         default:
             return false
         }
@@ -548,15 +642,15 @@ extension Token {
              .startOfScope("("), .startOfScope("["), .startOfScope("{"),
              .startOfScope where isStringDelimiter:
             return true
-        case let .keyword(name) where name.hasPrefix("#"):
-            return true
+        case let .keyword(name):
+            return name.isMacroOrCompilerDirective
         default:
             return false
         }
     }
 }
 
-extension Collection where Element == Token, Index == Int {
+extension Collection<Token> where Index == Int {
     var string: String {
         map(\.string).joined()
     }
@@ -592,9 +686,18 @@ extension Collection where Element == Token, Index == Int {
 }
 
 extension UnicodeScalar {
-    var isDigit: Bool { isdigit(Int32(value)) > 0 }
-    var isHexDigit: Bool { isxdigit(Int32(value)) > 0 }
-    var isLinebreak: Bool { "\n\r\u{000B}\u{000C}".unicodeScalars.contains(self) }
+    var isDigit: Bool {
+        isdigit(Int32(value)) > 0
+    }
+
+    var isHexDigit: Bool {
+        isxdigit(Int32(value)) > 0
+    }
+
+    var isLinebreak: Bool {
+        "\n\r\u{000B}\u{000C}".unicodeScalars.contains(self)
+    }
+
     var isSpace: Bool {
         switch value {
         case 0x0009, 0x0011, 0x0012, 0x0020,
@@ -613,70 +716,70 @@ extension UnicodeScalar {
 
 // Workaround for horribly slow String.UnicodeScalarView.Subsequence perf
 
-private struct UnicodeScalarView {
-    public typealias Index = String.UnicodeScalarView.Index
+struct UnicodeScalarView {
+    typealias Index = String.UnicodeScalarView.Index
 
     private let characters: String.UnicodeScalarView
-    public private(set) var startIndex: Index
-    public private(set) var endIndex: Index
+    private(set) var startIndex: Index
+    private(set) var endIndex: Index
 
-    public init(_ unicodeScalars: String.UnicodeScalarView) {
+    init(_ unicodeScalars: String.UnicodeScalarView) {
         characters = unicodeScalars
         startIndex = characters.startIndex
         endIndex = characters.endIndex
     }
 
-    public init(_ unicodeScalars: String.UnicodeScalarView.SubSequence) {
+    init(_ unicodeScalars: String.UnicodeScalarView.SubSequence) {
         self.init(String.UnicodeScalarView(unicodeScalars))
     }
 
-    public init(_ string: String) {
+    init(_ string: String) {
         self.init(string.unicodeScalars)
     }
 
-    public var first: UnicodeScalar? {
+    var first: UnicodeScalar? {
         isEmpty ? nil : characters[startIndex]
     }
 
     @available(*, deprecated, message: "Really hurts performance - use a different approach")
-    public var count: Int {
+    var count: Int {
         characters.distance(from: startIndex, to: endIndex)
     }
 
-    public var isEmpty: Bool {
+    var isEmpty: Bool {
         startIndex >= endIndex
     }
 
-    public subscript(_ index: Index) -> UnicodeScalar {
+    subscript(_ index: Index) -> UnicodeScalar {
         characters[index]
     }
 
-    public func index(after index: Index) -> Index {
+    func index(after index: Index) -> Index {
         characters.index(after: index)
     }
 
-    public func prefix(upTo index: Index) -> UnicodeScalarView {
+    func prefix(upTo index: Index) -> UnicodeScalarView {
         var view = UnicodeScalarView(characters)
         view.startIndex = startIndex
         view.endIndex = index
         return view
     }
 
-    public func suffix(from index: Index) -> UnicodeScalarView {
+    func suffix(from index: Index) -> UnicodeScalarView {
         var view = UnicodeScalarView(characters)
         view.startIndex = index
         view.endIndex = endIndex
         return view
     }
 
-    public func dropFirst() -> UnicodeScalarView {
+    func dropFirst() -> UnicodeScalarView {
         var view = UnicodeScalarView(characters)
         view.startIndex = characters.index(after: startIndex)
         view.endIndex = endIndex
         return view
     }
 
-    public mutating func popFirst() -> UnicodeScalar? {
+    mutating func popFirst() -> UnicodeScalar? {
         if isEmpty {
             return nil
         }
@@ -686,13 +789,13 @@ private struct UnicodeScalarView {
     }
 
     /// Will crash if n > remaining char count
-    public mutating func removeFirst(_ n: Int) {
+    mutating func removeFirst(_ n: Int) {
         startIndex = characters.index(startIndex, offsetBy: n)
     }
 
     /// Will crash if collection is empty
     @discardableResult
-    public mutating func removeFirst() -> UnicodeScalar {
+    mutating func removeFirst() -> UnicodeScalar {
         let oldIndex = startIndex
         startIndex = characters.index(after: startIndex)
         return characters[oldIndex]
@@ -742,7 +845,7 @@ private extension UnicodeScalarView {
 
     mutating func read(head: (UnicodeScalar) -> Bool, tail: (UnicodeScalar) -> Bool) -> String? {
         if let c = first, head(c) {
-            var index = self.index(after: startIndex)
+            var index = index(after: startIndex)
             while index < endIndex {
                 if !tail(self[index]) {
                     break
@@ -790,7 +893,7 @@ private extension UnicodeScalarView {
     }
 }
 
-private extension UnicodeScalarView {
+extension UnicodeScalarView {
     mutating func parseSpace() -> Token? {
         readCharacters(where: { $0.isSpace }).map { .space($0) }
     }
@@ -822,7 +925,7 @@ private extension UnicodeScalarView {
         }
         let start = self
         if readString("\"\"") {
-            if first?.isLinebreak ?? true {
+            if first?.isSpaceOrLinebreak ?? true {
                 return .startOfScope("\"\"\"")
             }
             self = start
@@ -884,6 +987,12 @@ private extension UnicodeScalarView {
             default:
                 return c == ">"
             }
+        }
+
+        // `::` is always parsed as a single operator.
+        // `:` is not a valid operator head, so it must be handled specially here.
+        if readString("::") {
+            return .operator("::", .none)
         }
 
         var start = self
@@ -1005,9 +1114,27 @@ private extension UnicodeScalarView {
             read(head: isHead, tail: isTail)
         }
 
+        func readRawIdentifier() -> String? {
+            readCharacters(where: { scalar in
+                // Characters disallowed in raw identifiers:
+                // https://github.com/swiftlang/swift-evolution/blob/main/proposals/0451-escaped-identifiers.md#permitted-characters
+                switch scalar.value {
+                case 0x60, // backtick (`)
+                     0x5C, // backslash (\)
+                     0x000D, // carriage return
+                     0x000A, // newline
+                     0x0000, // NUL character
+                     0x0001 ... 0x001F, 0x007F: // non-printable ASCII
+                    return false
+                default:
+                    return true
+                }
+            })
+        }
+
         let start = self
         if read("`") {
-            if let identifier = readIdentifier(), read("`") {
+            if let identifier = readRawIdentifier(), read("`") {
                 return .identifier("`" + identifier + "`")
             }
             self = start
@@ -1320,10 +1447,10 @@ public func tokenize(_ source: String) -> [Token] {
                 tokens.append(.startOfScope("("))
                 return
             case "\r", "\n":
-                if string != "" {
+                if string != "" || tokens.last(where: { !$0.isSpace })?.isLinebreak ?? false {
                     tokens.append(.stringBody(string))
-                    string = ""
                 }
+                string = ""
                 processLinebreak(c)
                 if let space = characters.parseSpace() {
                     tokens.append(space)
@@ -1566,7 +1693,7 @@ public func tokenize(_ source: String) -> [Token] {
         let prevToken: Token = tokens[i - 1]
         let type: OperatorType
         switch string {
-        case ":", "=", "->":
+        case ":", "::", "=", "->":
             type = .infix
         case ".":
             var _type = OperatorType.prefix
@@ -1847,15 +1974,14 @@ public func tokenize(_ source: String) -> [Token] {
                         convertOpeningChevronToOperator(at: scopeIndex)
                     }
                 case .delimiter(":") where scopeIndexStack.count > 1 &&
-                    [.endOfScope("case"), .operator("?", .infix)].contains(tokens[scopeIndexStack[scopeIndexStack.count - 2]]
-                    ):
+                    [.endOfScope("case"), .operator("?", .infix)].contains(tokens[scopeIndexStack[scopeIndexStack.count - 2]]):
                     // Not a generic scope
                     convertOpeningChevronToOperator(at: scopeIndex)
                     processToken()
                     return
-                case .keyword("throws"):
+                case .keyword("throws"), .keyword("repeat"), .keyword("let"):
                     break
-                case .keyword where !token.isAttribute && token != .keyword("repeat"), .endOfScope:
+                case .keyword where !token.isAttribute, .endOfScope:
                     // If we encountered a keyword other than `repeat`, or closing scope
                     // token that wasn't > then the opening < must have been an operator after all
                     convertOpeningChevronToOperator(at: scopeIndex)
@@ -1869,11 +1995,11 @@ public func tokenize(_ source: String) -> [Token] {
                    let prevIndex = index(of: .nonSpaceOrCommentOrLinebreak, before: count - 1),
                    tokens[prevIndex].isIdentifierOrKeyword
                 {
-                    if case let .keyword(name) = tokens[prevIndex] {
+                    if case let .keyword(name) = tokens[prevIndex], !name.isAttribute {
                         tokens[prevIndex] = .identifier(name)
                     }
                     if let prevPrevIndex = index(of: .nonSpaceOrCommentOrLinebreak, before: prevIndex),
-                       case let .keyword(name) = tokens[prevPrevIndex]
+                       case let .keyword(name) = tokens[prevPrevIndex], !name.isAttribute
                     {
                         tokens[prevPrevIndex] = .identifier(name)
                     }
@@ -1977,6 +2103,9 @@ public func tokenize(_ source: String) -> [Token] {
                 processCommentBody()
             default:
                 if let delimiterType = token.stringDelimiterType {
+                    if delimiterType.isMultiline, let token = characters.parseSpace() {
+                        tokens.append(token)
+                    }
                     processStringBody(delimiterType)
                 }
             }

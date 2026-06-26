@@ -11,9 +11,9 @@ import Foundation
 public extension FormatRule {
     static let hoistTry = FormatRule(
         help: "Move inline `try` keyword(s) to start of expression.",
-        options: ["throwcapturing"]
+        options: ["throw-capturing"]
     ) { formatter in
-        let names = formatter.options.throwCapturing.union(["expect"])
+        let names = formatter.options.throwCapturing.union(["expect", "XCTUnwrap"])
         formatter.forEachToken(where: {
             $0 == .startOfScope("(") || $0 == .startOfScope("[")
         }) { i, _ in

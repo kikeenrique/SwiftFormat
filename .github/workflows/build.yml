@@ -2,17 +2,26 @@ name: build
 
 on:
   push:
+    branches:
+      - main
+      - develop
   pull_request:
 jobs:
+  check-for-changes:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.changed_files > 0
+    steps:
+      - run: echo "PR has changes, proceeding with build jobs"
+
   macos:
+    needs: check-for-changes
     strategy:
       fail-fast: false
       matrix:
         macos:
-          - 13
-          - latest
+          - 15
         xcode:
-          - latest-stable
+          - 16.3
     runs-on: macos-${{ matrix.macos }}
     steps:
       - name: Select Xcode version
@@ -20,7 +29,7 @@ jobs:
         with:
           xcode-version: ${{ matrix.xcode }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build and Test
         run: |
           # Set up a git user for the git tests
@@ -35,13 +44,14 @@ jobs:
           cd ../../../../
           xcrun llvm-cov export -format="lcov" -instr-profile $pathCoverage Build/Build/Products/Debug/SwiftFormat.framework/SwiftFormat > info.lcov
       - name: Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           # the token is optional for a public repo, but including it anyway
           token: a47579fa-9a2a-4c48-b557-aa725c6b5f92
           env_vars: MD_APPLE_SDK_ROOT,RUNNER_OS,RUNNER_ARCH
 
   linux:
+    needs: check-for-changes
     strategy:
       fail-fast: false
       matrix:
@@ -56,7 +66,7 @@ jobs:
       options: --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --security-opt apparmor=unconfined
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build and Test
         run: |
           # Set up a git user for the git tests
@@ -69,31 +79,34 @@ jobs:
           swift test --enable-test-discovery
 
   windows:
+    needs: check-for-changes
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Version used by the release workflow
-          - branch: swift-6.1-release
-            tag: 6.1-RELEASE
+        hosts: [x86_64-unknown-windows-msvc, aarch64-unknown-windows-msvc]
+        swift:
+          - version: development
+          # Version used by the release workflow (includes static linking support)
+            build: DEVELOPMENT-SNAPSHOT-2025-08-27-a
     runs-on: windows-latest
-    name: windows (${{ matrix.tag }})
+    name: windows (${{ matrix.swift.build }})
     steps:
       - uses: compnerd/gha-setup-swift@main
         with:
-          tag: ${{ matrix.tag }}
-          branch: ${{ matrix.branch }}
-      - uses: actions/checkout@v4
+          swift-version: ${{ matrix.swift.version }}
+          swift-build: ${{ matrix.swift.build }}
+      - uses: actions/checkout@v5
       - run: swift test
 
   command-line-tool:
+    needs: check-for-changes
     strategy:
       fail-fast: false
       matrix:
         macos:
-          - 13
+          - 15
         xcode:
-          - latest-stable
+          - 16.3
     runs-on: macos-${{ matrix.macos }}
     steps:
       - name: Select Xcode version
@@ -101,18 +114,19 @@ jobs:
         with:
           xcode-version: ${{ matrix.xcode }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build Command Line Tool
         run: xcodebuild -project SwiftFormat.xcodeproj -scheme "SwiftFormat (Command Line Tool)" -sdk macosx clean build
 
   swiftformat-for-xcode:
+    needs: check-for-changes
     strategy:
       fail-fast: false
       matrix:
         macos:
-          - 13
+          - 15
         xcode:
-          - latest-stable
+          - 16.3
     runs-on: macos-${{ matrix.macos }}
     steps:
       - name: Select Xcode version
@@ -120,18 +134,19 @@ jobs:
         with:
           xcode-version: ${{ matrix.xcode }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build Swift Format for Xcode app
         run: xcodebuild -project SwiftFormat.xcodeproj -scheme "SwiftFormat for Xcode" -sdk macosx clean build
 
   editor-extension:
+    needs: check-for-changes
     strategy:
       fail-fast: false
       matrix:
         macos:
-          - 13
+          - 15
         xcode:
-          - latest-stable
+          - 16.3
     runs-on: macos-${{ matrix.macos }}
     steps:
       - name: Select Xcode version
@@ -139,6 +154,46 @@ jobs:
         with:
           xcode-version: ${{ matrix.xcode }}
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build Editor Extension
         run: xcodebuild -project SwiftFormat.xcodeproj -scheme "SwiftFormat (Editor Extension)" -sdk macosx clean build
+
+  regression-tests:
+    needs: check-for-changes
+    strategy:
+      fail-fast: false
+      matrix:
+        macos:
+          - 15
+        xcode:
+          - 16.3
+    runs-on: macos-${{ matrix.macos }}
+    steps:
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.xcode }}
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Run Regression Tests
+        run: xcodebuild -project SwiftFormat.xcodeproj -scheme "Regression Tests" test
+
+  performance-tests:
+    needs: check-for-changes
+    strategy:
+      fail-fast: false
+      matrix:
+        macos:
+          - 15
+        xcode:
+          - 16.3
+    runs-on: macos-${{ matrix.macos }}
+    steps:
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.xcode }}
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Build Target
+        run: xcodebuild -project SwiftFormat.xcodeproj -scheme "Performance Tests" build

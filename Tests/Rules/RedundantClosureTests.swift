@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantClosureTests: XCTestCase {
+final class RedundantClosureTests: XCTestCase {
     func testClosureAroundConditionalAssignmentNotRedundantForExplicitReturn() {
         let input = """
         let myEnum = MyEnum.a
@@ -426,7 +426,9 @@ class RedundantClosureTests: XCTestCase {
     }
 
     func testKeepsClosureThatThrowsError() {
-        let input = "let foo = try bar ?? { throw NSError() }()"
+        let input = """
+        let foo = try bar ?? { throw NSError() }()
+        """
         testFormatting(for: input, rule: .redundantClosure)
     }
 
@@ -439,7 +441,7 @@ class RedundantClosureTests: XCTestCase {
         /// would return a String instead.
         let void: Void = { discardableResult() }()
         """
-        testFormatting(for: input, rule: .redundantClosure)
+        testFormatting(for: input, rule: .redundantClosure, exclude: [.wrapFunctionBodies])
     }
 
     func testKeepsDiscardableResultClosure2() {
@@ -451,7 +453,7 @@ class RedundantClosureTests: XCTestCase {
         /// would return a String instead.
         let void: () = { discardableResult() }()
         """
-        testFormatting(for: input, rule: .redundantClosure)
+        testFormatting(for: input, rule: .redundantClosure, exclude: [.wrapFunctionBodies])
     }
 
     func testRedundantClosureDoesntLeaveStrayTry() {

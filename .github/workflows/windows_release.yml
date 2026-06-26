@@ -26,39 +26,35 @@ jobs:
     steps:
       - uses: compnerd/gha-setup-swift@main
         with:
-          tag: 6.1-RELEASE
-          branch: swift-6.1-release
+          swift-version: development
+          # Note: This snapshot includes the WindowsExperimental.sdk needed for static linking support,
+          # this will be merged into Windows.sdk in the near future and $ExperimentalSDK related flags below will need to be removed
+          swift-build: DEVELOPMENT-SNAPSHOT-2025-08-27-a
+          update-sdk-modules: true
 
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - run: swift build -c release --triple ${{ matrix.target-triple }} -Xswiftc -gnone
-
-      - uses: microsoft/setup-msbuild@v2.0.0
+        uses: actions/checkout@v5
 
       - shell: pwsh
         run: |
-          # Bundle the Swift runtime if the version we're using ships with a redistributable
-          $SwiftExePath = (& where.exe swift.exe)
-          if (-not ($SwiftExePath -match "(.+)\\Toolchains\\(\d+\.\d+\.\d+)[^\\]*\\.*")) {
-            throw "Unexpected Swift installation path format"
-          }
+          $ExperimentalSDK = "$(Split-Path -Path ${env:SDKROOT} -Parent)/WindowsExperimental.sdk"
+          swift build -c release --triple ${{ matrix.target-triple }} -debug-info-format none -Xswiftc -static-stdlib `
+            -Xswiftc -sdk -Xswiftc ${ExperimentalSDK}
 
-          $SwiftInstallRoot = $Matches[1]
-          $SwiftRuntimeVersion = $Matches[2]
-          $SwiftRedistDir = "$SwiftInstallRoot\Redistributables\$SwiftRuntimeVersion"
-          if (-not (Test-Path $SwiftRedistDir)) {
-            throw "Swift redistributable not found at $SwiftRedistDir"
-          }
+      - uses: microsoft/setup-msbuild@v3.0.0
 
+      - shell: pwsh
+        run: |
           & msbuild -nologo -restore Platforms\Windows\SwiftFormat.wixproj `
             -p:Configuration=Release `
             -p:ProductArchitecture=${{ matrix.product-arch }} `
             -p:ProductVersion=${{ github.event.release.tag_name || inputs.tag }} `
             -p:SwiftFormatBuildDir=${{ github.workspace }}\.build\${{ matrix.target-triple }}\release `
-            -p:SwiftRedistDir=$SwiftRedistDir `
             -p:OutputPath=${{ github.workspace }}\artifacts `
             -p:RunWixToolsOutOfProc=true
+
+      - name: 'Rename MSI file'
+        run: mv artifacts\SwiftFormat.msi artifacts\SwiftFormat.${{ matrix.product-arch }}.msi
 
       - name: 'Upload EXE'
         uses: actions/upload-artifact@v4
@@ -71,7 +67,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SwiftFormat.${{ matrix.product-arch }}.msi
-          path: artifacts\SwiftFormat.msi
+          path: artifacts\SwiftFormat.${{ matrix.product-arch }}.msi
           retention-days: 5
 
   upload:
@@ -81,27 +77,23 @@ jobs:
     if: always()
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+        uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
         with:
           path: downloaded-artifacts
           pattern: SwiftFormat.*.msi
       - name: Display structure of downloaded files
         run: ls -R downloaded-artifacts
-      - name: Move and rename MSI files to workspace root
+      - name: Move MSI files to workspace root
         run: |
-          for dir in downloaded-artifacts/SwiftFormat.*.msi; do
-            basename="$(basename "$dir")"                  # SwiftFormat.amd64.msi
-            arch="${basename#SwiftFormat.}"                # amd64.msi
-            arch="${arch%.msi}"                            # amd64
-            mv "$dir/SwiftFormat.msi" "./SwiftFormat.${arch}.msi"
-          done
+          mv downloaded-artifacts/*.msi ./
           rm -rf downloaded-artifacts
       - name: Display structure of uploadable files
         run: ls -R .
       - name: Upload release assets
-        uses: skx/github-action-publish-binaries@master
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: 'SwiftFormat.*.msi'
+          tag_name: ${{ github.event.release.tag_name || inputs.tag }}
+          files: SwiftFormat.*.msi/SwiftFormat.*.msi

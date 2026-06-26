@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class AcronymsTests: XCTestCase {
+final class AcronymsTests: XCTestCase {
     func testUppercaseAcronyms() {
         let input = """
         let url: URL
@@ -17,7 +17,7 @@ class AcronymsTests: XCTestCase {
         let id: ID
         let screenId = "screenId" // We intentionally don't change the content of strings
         let validUrls: Set<URL>
-        let validUrlschemes: Set<URL>
+        let validUrlschemes: Set<URL> // Edge case
 
         let uniqueIdentifier = UUID()
 
@@ -34,7 +34,7 @@ class AcronymsTests: XCTestCase {
         let id: ID
         let screenID = "screenId" // We intentionally don't change the content of strings
         let validURLs: Set<URL>
-        let validUrlschemes: Set<URL>
+        let validUrlschemes: Set<URL> // Edge case
 
         let uniqueIdentifier = UUID()
 
@@ -89,5 +89,45 @@ class AcronymsTests: XCTestCase {
 
         let options = FormatOptions(preserveAcronyms: ["externallyProvidedUrl", "toUrl"])
         testFormatting(for: input, output, rule: .acronyms, options: options)
+    }
+
+    func testAcronymMatchesPartOfOtherWordAtEndOfIdentifier() {
+        let input = """
+        struct MasKit {}
+        struct Mask {}
+        struct MaskView {}
+        """
+
+        let output = """
+        struct MASKit {}
+        struct Mask {}
+        struct MaskView {}
+        """
+
+        testFormatting(for: input, output, rule: .acronyms, options: FormatOptions(acronyms: ["MAS"]))
+    }
+
+    func testAcronymNotMatchedAsSuffixOfAnotherAcronym() {
+        let input = """
+        // Ids for ds store
+        var personIDs: [String]
+        var userIds: [Int]
+        var ids: [UUID]
+
+        /// The Ds store
+        struct DsStore {}
+        """
+
+        let output = """
+        // IDs for ds store
+        var personIDs: [String]
+        var userIDs: [Int]
+        var ids: [UUID]
+
+        /// The DS store
+        struct DSStore {}
+        """
+
+        testFormatting(for: input, output, rule: .acronyms, options: FormatOptions(acronyms: ["ID", "DS"]))
     }
 }

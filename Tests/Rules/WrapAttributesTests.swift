@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class WrapAttributesTests: XCTestCase {
+final class WrapAttributesTests: XCTestCase {
     func testPreserveWrappedFuncAttributeByDefault() {
         let input = """
         @objc
@@ -611,7 +611,7 @@ class WrapAttributesTests: XCTestCase {
         """
 
         let options = FormatOptions(varAttributes: .sameLine, storedVarAttributes: .sameLine, computedVarAttributes: .prevLine)
-        testFormatting(for: input, rule: .wrapAttributes, options: options)
+        testFormatting(for: input, rule: .wrapAttributes, options: options, exclude: [.redundantViewBuilder])
     }
 
     func testWrapAttributesInSwiftUIView() {
@@ -631,7 +631,7 @@ class WrapAttributesTests: XCTestCase {
         """
 
         let options = FormatOptions(varAttributes: .sameLine, complexAttributes: .prevLine)
-        testFormatting(for: input, rule: .wrapAttributes, options: options)
+        testFormatting(for: input, rule: .wrapAttributes, options: options, exclude: [.redundantViewBuilder])
     }
 
     func testInlineMainActorAttributeNotWrapped() {
@@ -640,6 +640,17 @@ class WrapAttributesTests: XCTestCase {
         var bar: @MainActor (Bar) -> Void
         """
         let options = FormatOptions(storedVarAttributes: .prevLine, computedVarAttributes: .prevLine)
+        testFormatting(for: input, rule: .wrapAttributes, options: options)
+    }
+
+    func testIssue2215_asyncEffectNotConfusedForModifier() {
+        let input = """
+        public typealias FooBar = @Sendable (_ foo: Foo, _ bar: Bar) async -> Void
+
+        struct Foo {}
+        """
+
+        let options = FormatOptions(funcAttributes: .prevLine, typeAttributes: .prevLine)
         testFormatting(for: input, rule: .wrapAttributes, options: options)
     }
 }

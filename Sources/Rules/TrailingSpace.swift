@@ -14,13 +14,18 @@ public extension FormatRule {
     static let trailingSpace = FormatRule(
         help: "Remove trailing space at end of a line.",
         orderAfter: [.wrap, .wrapArguments],
-        options: ["trimwhitespace"]
+        options: ["trim-whitespace"]
     ) { formatter in
         formatter.forEach(.space) { i, _ in
-            if formatter.token(at: i + 1)?.isLinebreak ?? true,
-               formatter.options.truncateBlankLines || formatter.token(at: i - 1)?.isLinebreak == false
-            {
-                formatter.removeToken(at: i)
+            switch formatter.token(at: i + 1) {
+            case nil, .linebreak:
+                if formatter.options.truncateBlankLines || formatter.token(at: i - 1)?.isLinebreak == false {
+                    formatter.removeToken(at: i)
+                }
+            case .stringBody("") where formatter.options.truncateBlankLines:
+                formatter.removeTokens(in: i ... i + 1)
+            default:
+                break
             }
         }
     } examples: {

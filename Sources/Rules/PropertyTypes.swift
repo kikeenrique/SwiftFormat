@@ -13,7 +13,7 @@ public extension FormatRule {
         help: "Convert property declarations to use inferred types (`let foo = Foo()`) or explicit types (`let foo: Foo = .init()`).",
         disabledByDefault: true,
         orderAfter: [.redundantType],
-        options: ["propertytypes", "inferredtypes", "preservedsymbols"]
+        options: ["property-types", "inferred-types", "preserved-property-types"]
     ) { formatter in
         formatter.forEach(.operator("=", .infix)) { equalsIndex, _ in
             // Preserve all properties in conditional statements like `if let foo = Bar() { ... }`
@@ -47,31 +47,24 @@ public extension FormatRule {
             let rhsStartIndex = rhsExpressionRange.lowerBound
 
             if useInferredType {
-                guard let type = property.type else { return }
-                let typeTokens = Array(formatter.tokens[type.range])
+                guard let type = property.type, let colonIndex = property.colonIndex else { return }
 
                 // If the type is wrapped in redundant parens, retrieve the inner type value
                 // before we check for types like `any Type` or `Type?`.
-                var typeTokensWithoutParens = typeTokens
-                while typeTokensWithoutParens.first == .startOfScope("("),
-                      typeTokensWithoutParens.last == .endOfScope(")"),
-                      !typeTokensWithoutParens.string.isTupleType
-                {
-                    typeTokensWithoutParens = Array(typeTokensWithoutParens.dropFirst().dropLast())
-                }
+                let typeWithoutParens = type.withoutParens()
 
                 // Preserve the existing formatting if the LHS type is optional.
                 //  - `let foo: Foo? = .foo` is valid, but `let foo = Foo?.foo`
                 //    is invalid if `.foo` is defined on `Foo` but not `Foo?`.
-                guard typeTokensWithoutParens.last?.isUnwrapOperator != true else { return }
+                guard typeWithoutParens.tokens.last?.isUnwrapOperator != true else { return }
 
                 // Preserve the existing formatting if the LHS type is an existential (indicated with `any`)
                 // or opaque type (indicated with `some`).
                 //  - The `extension MyProtocol where Self == MyType { ... }` syntax
                 //    creates static members where `let foo: any MyProtocol = .myType`
                 //    is valid, but `let foo = (any MyProtocol).myType` isn't.
-                guard typeTokensWithoutParens.first?.string != "any",
-                      typeTokensWithoutParens.first?.string != "some"
+                guard typeWithoutParens.tokens.first?.string != "any",
+                      typeWithoutParens.tokens.first?.string != "some"
                 else { return }
 
                 // Preserve the existing formatting if the RHS expression has a top-level infix operator.
@@ -86,7 +79,7 @@ public extension FormatRule {
                 }
 
                 // Preserve the formatting as-is if the type is manually excluded
-                if formatter.options.preservedSymbols.contains(type.name) {
+                if formatter.options.preservedPropertyTypes.contains(type.string) {
                     return
                 }
 
@@ -94,14 +87,14 @@ public extension FormatRule {
                 if formatter.tokens[rhsStartIndex].isOperator(".") {
                     // Preserve the formatting as-is if the identifier is manually excluded
                     if let identifierAfterDot = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: rhsStartIndex),
-                       formatter.options.preservedSymbols.contains(formatter.tokens[identifierAfterDot].string)
+                       formatter.options.preservedPropertyTypes.contains(formatter.tokens[identifierAfterDot].string)
                     { return }
 
                     // Update the . token from a prefix operator to an infix operator.
                     formatter.replaceToken(at: rhsStartIndex, with: .operator(".", .infix))
 
                     // Insert a copy of the type on the RHS before the dot
-                    formatter.insert(typeTokens, at: rhsStartIndex)
+                    formatter.insert(type.tokens, at: rhsStartIndex)
                 }
 
                 // If the RHS is an if/switch expression, check that each branch starts with a leading dot
@@ -122,7 +115,7 @@ public extension FormatRule {
 
                         // Preserve the formatting as-is if the identifier is manually excluded
                         if let identifierAfterDot = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: rhsStartIndex),
-                           formatter.options.preservedSymbols.contains(formatter.tokens[identifierAfterDot].string)
+                           formatter.options.preservedPropertyTypes.contains(formatter.tokens[identifierAfterDot].string)
                         {
                             hasInvalidConditionalBranch = true
                         }
@@ -138,8 +131,40 @@ public extension FormatRule {
                         formatter.replaceToken(at: dotIndex, with: .operator(".", .infix))
 
                         // Insert a copy of the type on the RHS before the dot
-                        formatter.insert(typeTokens, at: dotIndex)
+                        formatter.insert(type.tokens, at: dotIndex)
                     }
+                }
+
+                // Convert `let array: [Foo] = []` to `let array = [Foo]()`
+                else if type.isArray,
+                        formatter.tokens[rhsStartIndex] == .startOfScope("["),
+                        let nextToken = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: rhsStartIndex),
+                        formatter.tokens[nextToken] == .endOfScope("]"),
+                        rhsExpressionRange.upperBound == nextToken
+                {
+                    formatter.replaceTokens(in: rhsExpressionRange, with: tokenize("\(type.string)()"))
+                }
+
+                // Convert `let array: [Foo: Bar] = [:]` to `let array = [Foo: Bar]()`
+                else if type.isDictionary,
+                        formatter.tokens[rhsStartIndex] == .startOfScope("["),
+                        let secondToken = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: rhsStartIndex),
+                        formatter.tokens[secondToken] == .delimiter(":"),
+                        let thirdToken = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: secondToken),
+                        formatter.tokens[thirdToken] == .endOfScope("]"),
+                        rhsExpressionRange.upperBound == thirdToken
+                {
+                    formatter.replaceTokens(in: rhsExpressionRange, with: tokenize("\(type.string)()"))
+                }
+
+                // Convert `let set: Set<Foo> = []` to `let set = Set<Foo>()`
+                else if type.isSet,
+                        formatter.tokens[rhsStartIndex] == .startOfScope("["),
+                        let nextToken = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: rhsStartIndex),
+                        formatter.tokens[nextToken] == .endOfScope("]"),
+                        rhsExpressionRange.upperBound == nextToken
+                {
+                    formatter.replaceTokens(in: rhsExpressionRange, with: tokenize("\(type.string)()"))
                 }
 
                 else {
@@ -147,7 +172,7 @@ public extension FormatRule {
                 }
 
                 // Remove the colon and explicit type before the equals token
-                formatter.removeTokens(in: type.colonIndex ... type.range.upperBound)
+                formatter.removeTokens(in: colonIndex ... type.range.upperBound)
             }
 
             // If using explicit types, convert properties to the format `let foo: Foo = .init()`.
@@ -160,7 +185,7 @@ public extension FormatRule {
                     formatter.tokens[indexAfterIdentifier] != .delimiter(":"),
                     let indexAfterType = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: rhsType.range.upperBound),
                     [.operator(".", .infix), .startOfScope("(")].contains(formatter.tokens[indexAfterType]),
-                    !rhsType.name.contains(".")
+                    !rhsType.string.contains(".")
                 else { return }
 
                 // Preserve the existing formatting if the RHS expression has a top-level operator.
@@ -176,19 +201,41 @@ public extension FormatRule {
 
                 // Preserve any types that have been manually excluded.
                 // Preserve any `Void` types and tuples, since they're special and don't support things like `.init`
-                guard !(formatter.options.preservedSymbols + ["Void"]).contains(rhsType.name),
-                      !rhsType.name.hasPrefix("(")
+                guard !(formatter.options.preservedPropertyTypes + ["Void"]).contains(rhsType.string),
+                      !rhsType.string.hasPrefix("(")
                 else { return }
 
                 // A type name followed by a `(` is an implicit `.init(`. Insert a `.init`
                 // so that the init call stays valid after we move the type to the LHS.
-                if formatter.tokens[indexAfterType] == .startOfScope("(") {
+                if formatter.tokens[indexAfterType] == .startOfScope("("),
+                   let endOfInitCallScope = formatter.endOfScope(at: indexAfterType),
+                   rhsExpressionRange.upperBound == endOfInitCallScope
+                {
                     // Preserve the existing format if `init` is manually excluded
-                    if formatter.options.preservedSymbols.contains("init") {
+                    if formatter.options.preservedPropertyTypes.contains("init") {
                         return
                     }
 
-                    formatter.insert([.operator(".", .prefix), .identifier("init")], at: indexAfterType)
+                    let initializerHasNoArguments = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: indexAfterType) == endOfInitCallScope
+
+                    // If this is an empty array initializer, use `[]` instead of `.init()`
+                    if rhsType.isArray, initializerHasNoArguments {
+                        formatter.replaceTokens(in: indexAfterType ... endOfInitCallScope, with: tokenize("[]"))
+                    }
+
+                    // If this is an empty dictionary initializer, use `[:]` instead of `.init()`
+                    else if rhsType.isDictionary, initializerHasNoArguments {
+                        formatter.replaceTokens(in: indexAfterType ... endOfInitCallScope, with: tokenize("[:]"))
+                    }
+
+                    // If this is an empty set initializer, use `[]` instead of `.init()`
+                    else if rhsType.isSet, initializerHasNoArguments {
+                        formatter.replaceTokens(in: indexAfterType ... endOfInitCallScope, with: tokenize("[]"))
+                    }
+
+                    else {
+                        formatter.insert([.operator(".", .prefix), .identifier("init")], at: indexAfterType)
+                    }
                 }
 
                 // If the type name is followed by an infix `.` operator, convert it to a prefix operator.
@@ -198,11 +245,11 @@ public extension FormatRule {
                     //    if the property is `static var themeColor: Color` or `static var themeColor: Color.Theme`.
                     //  - This isn't a problem with something like `Color.Theme()`, which we can reasonably assume
                     //    is an initializer
-                    if rhsType.name.contains(".") { return }
+                    if rhsType.string.contains(".") { return }
 
                     // Preserve the formatting as-is if the identifier is manually excluded.
                     // Don't convert `let foo = Foo.self` to `let foo: Foo = .self`, since `.self` returns the metatype
-                    let symbolsToExclude = formatter.options.preservedSymbols + ["self"]
+                    let symbolsToExclude = formatter.options.preservedPropertyTypes + ["self"]
                     if let indexAfterDot = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: indexAfterType),
                        symbolsToExclude.contains(formatter.tokens[indexAfterDot].string)
                     { return }
@@ -219,15 +266,39 @@ public extension FormatRule {
     } examples: {
         """
         ```diff
-        // with --propertytypes inferred
-        - let view: UIView = UIView()
+          // with --propertytypes inferred
+        - let view: UIView = .init()
         + let view = UIView()
 
-        // with --propertytypes explicit
-        - let view: UIView = UIView()
+        - let color: Color = .red
+        + let color = Color.red
+
+        - let array: [Int] = []
+        + let array = [Int]()
+
+        - let set: Set<Int> = []
+        + let set = Set<Int>()
+
+        - let dict: [String: Int] = [:]
+        + let dict = [String: Int]()
+
+          // with --propertytypes explicit
+        - let view = UIView()
         + let view: UIView = .init()
 
-        // with --propertytypes infer-locals-only
+        - let color = Color.red
+        + let color: Color = .red
+
+        - let array = [Int]()
+        + let array: [Int] = []
+
+        - let set = Set<Int>()
+        + let set: Set<Int> = []
+
+        - let dict = [String: Int]()
+        + let dict: [String: Int] = [:]
+
+          // with --propertytypes infer-locals-only
           class Foo {
         -     let view: UIView = UIView()
         +     let view: UIView = .init()

@@ -9,97 +9,129 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantNilInitTests: XCTestCase {
+final class RedundantNilInitTests: XCTestCase {
     func testRemoveRedundantNilInit() {
-        let input = "var foo: Int? = nil\nlet bar: Int? = nil"
-        let output = "var foo: Int?\nlet bar: Int? = nil"
+        let input = """
+        var foo: Int? = nil
+        let bar: Int? = nil
+        """
+        let output = """
+        var foo: Int?
+        let bar: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveLetNilInitAfterVar() {
-        let input = "var foo: Int; let bar: Int? = nil"
+        let input = """
+        var foo: Int
+        let bar: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveNonNilInit() {
-        let input = "var foo: Int? = 0"
+        let input = """
+        var foo: Int? = 0
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testRemoveRedundantImplicitUnwrapInit() {
-        let input = "var foo: Int! = nil"
-        let output = "var foo: Int!"
-        let options = FormatOptions(nilInit: .remove)
-        testFormatting(for: input, output, rule: .redundantNilInit,
-                       options: options)
-    }
-
-    func testRemoveMultipleRedundantNilInitsInSameLine() {
-        let input = "var foo: Int? = nil, bar: Int? = nil"
-        let output = "var foo: Int?, bar: Int?"
+        let input = """
+        var foo: Int! = nil
+        """
+        let output = """
+        var foo: Int!
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveLazyVarNilInit() {
-        let input = "lazy var foo: Int? = nil"
+        let input = """
+        lazy var foo: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveLazyPublicPrivateSetVarNilInit() {
-        let input = "lazy private(set) public var foo: Int? = nil"
+        let input = """
+        lazy private(set) public var foo: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit, options: options,
                        exclude: [.modifierOrder])
     }
 
     func testNoRemoveCodableNilInit() {
-        let input = "struct Foo: Codable, Bar {\n    enum CodingKeys: String, CodingKey {\n        case bar = \"_bar\"\n    }\n\n    var bar: Int?\n    var baz: String? = nil\n}"
+        let input = """
+        struct Foo: Codable, Bar {
+            enum CodingKeys: String, CodingKey {
+                case bar = \"_bar\"
+            }
+
+            var bar: Int?
+            var baz: String? = nil
+        }
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveNilInitWithPropertyWrapper() {
-        let input = "@Foo var foo: Int? = nil"
+        let input = """
+        @Foo var foo: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveNilInitWithLowercasePropertyWrapper() {
-        let input = "@foo var foo: Int? = nil"
+        let input = """
+        @foo var foo: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveNilInitWithPropertyWrapperWithArgument() {
-        let input = "@Foo(bar: baz) var foo: Int? = nil"
+        let input = """
+        @Foo(bar: baz) var foo: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoRemoveNilInitWithLowercasePropertyWrapperWithArgument() {
-        let input = "@foo(bar: baz) var foo: Int? = nil"
+        let input = """
+        @foo(bar: baz) var foo: Int? = nil
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testRemoveNilInitWithObjcAttributes() {
-        let input = "@objc var foo: Int? = nil"
-        let output = "@objc var foo: Int?"
+        let input = """
+        @objc var foo: Int? = nil
+        """
+        let output = """
+        @objc var foo: Int?
+        """
         let options = FormatOptions(nilInit: .remove)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
@@ -181,8 +213,18 @@ class RedundantNilInitTests: XCTestCase {
             }
         }
         """
+        let output = """
+        struct TestView: View {
+            var body: some View {
+                if true {
+                    var foo: String? = nil
+                    Text(foo ?? "")
+                }
+            }
+        }
+        """
         let options = FormatOptions(nilInit: .remove)
-        testFormatting(for: input, rule: .redundantNilInit,
+        testFormatting(for: input, [input, output], rules: [.redundantNilInit],
                        options: options)
     }
 
@@ -209,104 +251,190 @@ class RedundantNilInitTests: XCTestCase {
     // --nilInit insert
 
     func testInsertNilInit() {
-        let input = "var foo: Int?\nlet bar: Int? = nil"
-        let output = "var foo: Int? = nil\nlet bar: Int? = nil"
+        let input = """
+        var foo: Int?
+        let bar: Int? = nil
+        """
+        let output = """
+        var foo: Int? = nil
+        let bar: Int? = nil
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
     }
 
     func testInsertNilInitBeforeLet() {
-        let input = "var foo: Int?; let bar: Int? = nil"
-        let output = "var foo: Int? = nil; let bar: Int? = nil"
+        let input = """
+        var foo: Int?
+        let bar: Int? = nil
+        """
+        let output = """
+        var foo: Int? = nil
+        let bar: Int? = nil
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
     }
 
     func testInsertNilInitAfterLet() {
-        let input = "let bar: Int? = nil; var foo: Int?"
-        let output = "let bar: Int? = nil; var foo: Int? = nil"
+        let input = """
+        let bar: Int? = nil
+        var foo: Int?
+        """
+        let output = """
+        let bar: Int? = nil
+        var foo: Int? = nil
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoInsertNonNilInit() {
-        let input = "var foo: Int? = 0"
+        let input = """
+        var foo: Int? = 0
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testInsertRedundantImplicitUnwrapInit() {
-        let input = "var foo: Int!"
-        let output = "var foo: Int! = nil"
-        let options = FormatOptions(nilInit: .insert)
-        testFormatting(for: input, output, rule: .redundantNilInit,
-                       options: options)
-    }
-
-    func testInsertMultipleRedundantNilInitsInSameLine() {
-        let input = "var foo: Int?, bar: Int?"
-        let output = "var foo: Int? = nil, bar: Int? = nil"
+        let input = """
+        var foo: Int!
+        """
+        let output = """
+        var foo: Int! = nil
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoInsertLazyVarNilInit() {
-        let input = "lazy var foo: Int?"
+        let input = """
+        lazy var foo: Int?
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoInsertLazyPublicPrivateSetVarNilInit() {
-        let input = "lazy private(set) public var foo: Int?"
+        let input = """
+        lazy private(set) public var foo: Int?
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit, options: options,
                        exclude: [.modifierOrder])
     }
 
     func testNoInsertCodableNilInit() {
-        let input = "struct Foo: Codable, Bar {\n    enum CodingKeys: String, CodingKey {\n        case bar = \"_bar\"\n    }\n\n    var bar: Int?\n    var baz: String? = nil\n}"
+        let input = """
+        struct Foo: Codable, Bar {
+            enum CodingKeys: String, CodingKey {
+                case bar = \"_bar\"
+            }
+
+            var bar: Int?
+            var baz: String? = nil
+        }
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoInsertNilInitWithPropertyWrapper() {
-        let input = "@Foo var foo: Int?"
+        let input = """
+        @Foo var foo: Int?
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoInsertNilInitWithLowercasePropertyWrapper() {
-        let input = "@foo var foo: Int?"
+        let input = """
+        @foo var foo: Int?
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoInsertNilInitWithPropertyWrapperWithArgument() {
-        let input = "@Foo(bar: baz) var foo: Int?"
+        let input = """
+        @Foo(bar: baz) var foo: Int?
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testNoInsertNilInitWithLowercasePropertyWrapperWithArgument() {
-        let input = "@foo(bar: baz) var foo: Int?"
+        let input = """
+        @foo(bar: baz) var foo: Int?
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
                        options: options)
     }
 
     func testInsertNilInitWithObjcAttributes() {
-        let input = "@objc var foo: Int?"
-        let output = "@objc var foo: Int? = nil"
+        let input = """
+        @objc var foo: Int?
+        """
+        let output = """
+        @objc var foo: Int? = nil
+        """
+        let options = FormatOptions(nilInit: .insert)
+        testFormatting(for: input, output, rule: .redundantNilInit,
+                       options: options)
+    }
+
+    func testNoInsertNilInitForClosureReturningOptional() {
+        let input = """
+        private var receiverSelector: @MainActor (IntrospectionPlatformViewController) -> Target?
+        private var ancestorSelector: @MainActor (IntrospectionPlatformViewController) -> Target?
+        """
+        let options = FormatOptions(nilInit: .insert)
+        testFormatting(for: input, rule: .redundantNilInit, options: options)
+    }
+
+    func testNoInsertNilInitForClosureReturningOptionalWithAsyncThrows() {
+        let input = """
+        var fetcher: () async throws -> Response?
+        """
+        let options = FormatOptions(nilInit: .insert)
+        testFormatting(for: input, rule: .redundantNilInit, options: options)
+    }
+
+    func testNoInsertNilInitForClosureReturningOptionalWithGenericArgument() {
+        let input = """
+        var reducer: (Result<String, Error>) -> State?
+        """
+        let options = FormatOptions(nilInit: .insert)
+        testFormatting(for: input, rule: .redundantNilInit, options: options)
+    }
+
+    func testNoInsertNilInitForClosureReturningOptionalWithNestedClosureParameter() {
+        let input = """
+        var completion: (@MainActor () async -> Void) -> Result<Void, Error>?
+        """
+        let options = FormatOptions(nilInit: .insert)
+        testFormatting(for: input, rule: .redundantNilInit, options: options)
+    }
+
+    func testInsertNilInitForOptionalClosureProperty() {
+        let input = """
+        var handler: (() -> Void)?
+        """
+        let output = """
+        var handler: (() -> Void)? = nil
+        """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
@@ -396,8 +524,18 @@ class RedundantNilInitTests: XCTestCase {
             }
         }
         """
+        let output = """
+        struct TestView: View {
+            var body: some View {
+                if true {
+                    var foo: String?
+                    Text(foo ?? "")
+                }
+            }
+        }
+        """
         let options = FormatOptions(nilInit: .insert)
-        testFormatting(for: input, rule: .redundantNilInit,
+        testFormatting(for: input, [input, output], rules: [.redundantNilInit],
                        options: options)
     }
 
@@ -429,7 +567,7 @@ class RedundantNilInitTests: XCTestCase {
         """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
-                       options: options)
+                       options: options, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testNoInsertNilInitInMultilineComputedProperty() {
@@ -474,7 +612,7 @@ class RedundantNilInitTests: XCTestCase {
         """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, output, rule: .redundantNilInit,
-                       options: options)
+                       options: options, exclude: [.wrapPropertyBodies])
     }
 
     func testNoInsertNilInitInAs() {
@@ -484,6 +622,22 @@ class RedundantNilInitTests: XCTestCase {
         """
         let options = FormatOptions(nilInit: .insert)
         testFormatting(for: input, rule: .redundantNilInit,
+                       options: options)
+    }
+
+    func testRemoveRedundantNilInitInSubclass() {
+        let input = """
+        class SomeClass2: SomeClass {
+            var optionalString2: String? = nil
+        }
+        """
+        let output = """
+        class SomeClass2: SomeClass {
+            var optionalString2: String?
+        }
+        """
+        let options = FormatOptions(nilInit: .remove)
+        testFormatting(for: input, output, rule: .redundantNilInit,
                        options: options)
     }
 }

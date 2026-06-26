@@ -4,8 +4,7 @@
 public extension FormatRule {
     static let redundantEquatable = FormatRule(
         help: "Omit a hand-written Equatable implementation when the compiler-synthesized conformance would be equivalent.",
-        disabledByDefault: true,
-        options: ["equatablemacro"]
+        options: ["equatable-macro"]
     ) { formatter in
         // Find all of the types with an `Equatable` conformance and a manually-implemented `static func ==` implementation.
         let declarations = formatter.parseDeclarations()
@@ -43,11 +42,17 @@ public extension FormatRule {
                 continue
             }
 
+            // Don't remove functions that have attributes (e.g. @usableFromInline, @inlinable)
+            // since these attributes can't be applied to synthesized Equatable conformances
+            guard equatableType.equatableFunction.attributes.isEmpty else {
+                continue
+            }
+
             // The compiler automatically synthesizes Equatable implementations for structs
             // as long as all of the properties are themselves Equatable. This is usually true
             //
             if equatableType.typeDeclaration.keyword == "struct",
-               !storedInstanceProperties.contains(where: { $0.parsePropertyDeclaration()?.type?.name.isKnownNonEquatableType == true })
+               !storedInstanceProperties.contains(where: { $0.parsePropertyDeclaration()?.type?.isKnownNonEquatableType == true })
             {
                 equatableType.equatableFunction.remove()
             }
@@ -57,7 +62,7 @@ public extension FormatRule {
             else if case let .macro(macro, module: module) = formatter.options.equatableMacro {
                 let declarationWithEquatableConformance = equatableType.declarationWithEquatableConformance
 
-                guard let equatableConformance = formatter.parseConformancesOfType(atKeywordIndex: declarationWithEquatableConformance.keywordIndex).first(where: { $0.conformance == "Equatable" || $0.conformance == "Hashable" })
+                guard let equatableConformance = formatter.parseConformancesOfType(atKeywordIndex: declarationWithEquatableConformance.keywordIndex).first(where: { $0.conformance.string == "Equatable" || $0.conformance.string == "Hashable" })
                 else { continue }
 
                 // Exclude cases where the Equatable conformance is defined in an extension with a where clause,
@@ -73,14 +78,14 @@ public extension FormatRule {
 
                 // Remove the `: Equatable` conformance.
                 //  - If this type uses as `: Hashable` conformance, we have to preserve that.
-                if equatableConformance.conformance == "Equatable" {
+                if equatableConformance.conformance.string == "Equatable" {
                     formatter.removeConformance(at: equatableConformance.index)
                 }
 
                 // Add the `@Equatable` macro
                 formatter.insert(
                     [.keyword(macro), .space(" ")],
-                    at: equatableType.typeDeclaration.startOfModifiersIndex
+                    at: equatableType.typeDeclaration.startOfModifiersIndex(includingAttributes: true)
                 )
 
                 // Import the module that defines the `@Equatable` macro if needed
@@ -110,12 +115,12 @@ public extension FormatRule {
         ```
 
         If your project includes a macro that generates the `static func ==` implementation
-        for the attached class, you can specify `--equatablemacro @Equatable,MyMacroLib`
+        for the attached class, you can specify `--equatable-macro @Equatable,MyMacroLib`
         and this rule will also migrate eligible classes to use your macro instead of
         a hand-written Equatable conformance:
 
         ```diff
-          // --equatablemacro @Equatable,MyMacroLib
+          // --equatable-macro @Equatable,MyMacroLib
           import FooLib
         + import MyMacroLib
 
@@ -148,6 +153,7 @@ extension Formatter {
     func manuallyImplementedEquatableTypes(in declarations: [Declaration]) -> [EquatableType] {
         var typeDeclarationsByFullyQualifiedName: [String: Declaration] = [:]
         var typesWithEquatableConformances: [(fullyQualifiedTypeName: String, declarationWithEquatableConformance: Declaration)] = []
+        var typesWithStrideableConformances: Set<String> = []
         var equatableImplementationsByFullyQualifiedName: [String: Declaration] = [:]
 
         declarations.forEachRecursiveDeclaration { declaration in
@@ -166,12 +172,17 @@ extension Formatter {
 
                 // Both an Equatable and Hashable conformance will cause the Equatable conformance to be synthesized
                 if conformances.contains(where: {
-                    $0.conformance == "Equatable" || $0.conformance == "Hashable"
+                    $0.conformance.string == "Equatable" || $0.conformance.string == "Hashable"
                 }) {
                     typesWithEquatableConformances.append((
                         fullyQualifiedTypeName: fullyQualifiedName,
                         declarationWithEquatableConformance: declaration
                     ))
+                }
+
+                // Strideable provides a default `==` implementation, so a custom `==` may not be redundant
+                if conformances.contains(where: { $0.conformance.string == "Strideable" }) {
+                    typesWithStrideableConformances.insert(fullyQualifiedName)
                 }
             }
 
@@ -188,7 +199,7 @@ extension Formatter {
                    functionArguments[1].internalLabel == "rhs",
                    functionArguments[0].type == functionArguments[1].type
                 {
-                    var comparedTypeName = functionArguments[0].type
+                    var comparedTypeName = functionArguments[0].type.string
 
                     if let parentDeclaration = declaration.parent {
                         // If the function uses `Self`, resolve that to the name of the parent type
@@ -224,6 +235,10 @@ extension Formatter {
         }
 
         return typesWithEquatableConformances.compactMap { typeName, declarationWithEquatableConformance in
+            // Types conforming to Strideable get a default `==` implementation via that protocol,
+            // so a custom `==` on such a type may be intentionally overriding that default.
+            guard !typesWithStrideableConformances.contains(typeName) else { return nil }
+
             guard let typeDeclaration = typeDeclarationsByFullyQualifiedName[typeName],
                   let equatableImplementation = equatableImplementationsByFullyQualifiedName[typeName]
             else { return nil }
@@ -296,10 +311,10 @@ extension Formatter {
     }
 }
 
-extension String {
+extension TypeName {
     /// Whether or not this type name is known to be non-Equatable
     var isKnownNonEquatableType: Bool {
-        let knownNonEquatableTypes = ["AnyClass"]
-        return knownNonEquatableTypes.contains(self) || isTupleType
+        let knownNonEquatableTypes = ["AnyClass", "Any.Type"]
+        return knownNonEquatableTypes.contains(string) || isTuple
     }
 }

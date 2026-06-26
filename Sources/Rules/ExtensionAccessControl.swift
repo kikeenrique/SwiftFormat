@@ -11,11 +11,25 @@ import Foundation
 public extension FormatRule {
     static let extensionAccessControl = FormatRule(
         help: "Configure the placement of an extension's access control keyword.",
-        options: ["extensionacl"]
+        options: ["extension-acl"]
     ) { formatter in
-        guard !formatter.options.fragment else { return }
-
         let declarations = formatter.parseDeclarations()
+
+        // Build a map of fully-qualified type names to their effective visibility.
+        var typeVisibilityByName = [String: Visibility]()
+        declarations.forEachRecursiveDeclaration { declaration in
+            guard declaration.keyword != "extension",
+                  declaration.asTypeDeclaration != nil,
+                  let qualifiedName = declaration.fullyQualifiedName
+            else { return }
+
+            // A type declared inside a `public extension` inherits public visibility.
+            let insidePublicExtension = declaration.parentDeclarations.contains(where: {
+                $0.keyword == "extension" && $0.visibility() == .public
+            })
+            typeVisibilityByName[qualifiedName] = insidePublicExtension ? .public : (declaration.visibility() ?? .internal)
+        }
+
         declarations.forEachRecursiveDeclaration { declaration in
             guard let extensionDeclaration = declaration.asTypeDeclaration,
                   extensionDeclaration.keyword == "extension"
@@ -56,18 +70,13 @@ public extension FormatRule {
                 else { return }
 
                 if memberVisibility > extensionVisibility ?? .internal {
-                    // Check type being extended does not have lower visibility
-                    for extendedType in declarations where extendedType.name == extensionDeclaration.name {
-                        guard let type = extendedType.asTypeDeclaration else { continue }
-
-                        if extendedType.keyword != "extension",
-                           extendedType.visibility() ?? .internal < memberVisibility
-                        {
-                            // Cannot make extension with greater visibility than type being extended
-                            return
-                        }
-
-                        break
+                    // Check the type being extended does not have lower visibility.
+                    if let extendedTypeName = extensionDeclaration.name,
+                       let typeVisibility = typeVisibilityByName[extendedTypeName],
+                       typeVisibility < memberVisibility
+                    {
+                        // Cannot make extension with greater visibility than type being extended
+                        return
                     }
                 }
 
@@ -91,7 +100,7 @@ public extension FormatRule {
             // Move the extension's visibility keyword to each individual declaration
             case .onDeclarations:
                 // If the extension visibility is unspecified then there isn't any work to do
-                guard let extensionVisibility = extensionVisibility else { return }
+                guard let extensionVisibility else { return }
 
                 // Remove the visibility keyword from the extension declaration itself
                 extensionDeclaration.removeVisibility(visibilityKeyword!)
@@ -109,7 +118,7 @@ public extension FormatRule {
         }
     } examples: {
         """
-        `--extensionacl on-extension` (default)
+        `--extension-acl on-extension` (default)
 
         ```diff
         - extension Foo {
@@ -123,7 +132,7 @@ public extension FormatRule {
           }
         ```
 
-        `--extensionacl on-declarations`
+        `--extension-acl on-declarations`
 
         ```diff
         - public extension Foo {
@@ -142,11 +151,11 @@ public extension FormatRule {
     }
 }
 
-extension Collection where Element == Declaration {
-    // Performs the given operation for each declaration in this tree of declarations,
-    // including the body of any child conditional compilation blocks,
-    // but not the body of any child types. All of the iterated declarations belong
-    // directly to the parent scope holding this array of declarations.
+extension Collection<Declaration> {
+    /// Performs the given operation for each declaration in this tree of declarations,
+    /// including the body of any child conditional compilation blocks,
+    /// but not the body of any child types. All of the iterated declarations belong
+    /// directly to the parent scope holding this array of declarations.
     func forEachRecursiveDeclarationExcludingTypeBodies(_ operation: (Declaration) -> Void) {
         for declaration in self {
             switch declaration.kind {

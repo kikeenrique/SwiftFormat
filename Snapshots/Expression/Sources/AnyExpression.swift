@@ -275,7 +275,7 @@ public struct AnyExpression: CustomStringConvertible {
         let boolSymbols = options.contains(.boolSymbols) ? Expression.boolSymbols : [:]
         let shouldOptimize = !options.contains(.noOptimize)
 
-        // Evaluators
+        /// Evaluators
         func defaultEvaluator(for symbol: Symbol) -> Expression.SymbolEvaluator? {
             if let fn = AnyExpression.standardSymbols[symbol] {
                 return fn
@@ -577,11 +577,15 @@ public struct AnyExpression: CustomStringConvertible {
     }
 
     /// All symbols used in the expression
-    public var symbols: Set<Symbol> { return expression.symbols }
+    public var symbols: Set<Symbol> {
+        return expression.symbols
+    }
 
     /// Returns the optmized, pretty-printed expression if it was valid
     /// Otherwise, returns the original (invalid) expression string
-    public var description: String { return describer() }
+    public var description: String {
+        return describer()
+    }
 }
 
 // MARK: Internal API
@@ -687,7 +691,7 @@ extension AnyExpression {
     static func stringify(_ value: Any) -> String {
         switch value {
         case let number as NSNumber:
-            /// https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html
+            // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjCRuntimeGuide/Articles/ocrtTypeEncodings.html
             switch UnicodeScalar(UInt8(number.objCType.pointee)) {
             case "c",
                  "B":
@@ -774,15 +778,15 @@ private extension AnyExpression {
         }
 
         /// Literal values
-        public static let nilValue = Double(bitPattern: nilBits)
-        public static let trueValue = Double(bitPattern: trueBits)
-        public static let falseValue = Double(bitPattern: falseBits)
+        static let nilValue = Double(bitPattern: nilBits)
+        static let trueValue = Double(bitPattern: trueBits)
+        static let falseValue = Double(bitPattern: falseBits)
 
         /// The values stored in the box
-        public var values = [Any]()
+        var values = [Any]()
 
         /// Store a value in the box
-        public func store(_ value: Any) -> Double {
+        func store(_ value: Any) -> Double {
             switch value {
             case let doubleValue as Double:
                 return doubleValue
@@ -1189,15 +1193,25 @@ private protocol _Optional {
 }
 
 extension Optional: _Optional {
-    fileprivate var value: Any? { return self }
-    fileprivate static var wrappedType: Any.Type { return Wrapped.self }
+    fileprivate var value: Any? {
+        return self
+    }
+
+    fileprivate static var wrappedType: Any.Type {
+        return Wrapped.self
+    }
 }
 
 #if !swift(>=3.4) || (swift(>=4) && !swift(>=4.1.5))
 
     extension ImplicitlyUnwrappedOptional: _Optional {
-        fileprivate var value: Any? { return self }
-        fileprivate static var wrappedType: Any.Type { return Wrapped.self }
+        fileprivate var value: Any? {
+            return self
+        }
+
+        fileprivate static var wrappedType: Any.Type {
+            return Wrapped.self
+        }
     }
 
 #endif

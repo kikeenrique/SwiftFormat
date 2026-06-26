@@ -11,8 +11,7 @@ import Foundation
 public extension FormatRule {
     /// Remove empty, non-conforming, extensions.
     static let emptyExtensions = FormatRule(
-        help: "Remove empty, non-conforming, extensions.",
-        disabledByDefault: true,
+        help: "Remove empty, non-protocol-conforming extensions.",
         orderAfter: [.unusedPrivateDeclarations]
     ) { formatter in
         var emptyExtensions = [TypeDeclaration]()
@@ -22,7 +21,7 @@ public extension FormatRule {
                   let extensionDeclaration = declaration.asTypeDeclaration,
                   extensionDeclaration.body.isEmpty,
                   // Ensure that it is not a macro
-                  !extensionDeclaration.modifiers.contains(where: { $0.first == "@" })
+                  !extensionDeclaration.modifiers.contains(where: \.isAttribute)
             else { continue }
 
             // Ensure that the extension does not conform to any protocols

@@ -29,10 +29,11 @@
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //  SOFTWARE.
 //
-///  Reports changes as XML conforming to the Checkstyle specification, as defined here:
-///  https://www.jetbrains.com/help/teamcity/xml-report-processing.html
+
 import Foundation
 
+///  Reports changes as XML conforming to the Checkstyle specification, as defined here:
+///  https://www.jetbrains.com/help/teamcity/xml-report-processing.html
 final class XMLReporter: Reporter {
     static let name = "xml"
     static let fileExtension: String? = "xml"
@@ -60,9 +61,18 @@ final class XMLReporter: Reporter {
 }
 
 private extension XMLReporter {
+    func escapeXML(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+    }
+
     func generateChangeForFile(_ file: String, fileChanges: [Formatter.Change]) -> String {
         [
-            "\n\t<file name=\"", file, "\">\n",
+            "\n\t<file name=\"", escapeXML(file), "\">\n",
             fileChanges.map(generateChange).joined(),
             "\t</file>",
         ].joined()
@@ -72,8 +82,8 @@ private extension XMLReporter {
         let line = change.line
         let col = 0
         let severity = "warning"
-        let reason = change.help
-        let rule = change.rule.name
+        let reason = escapeXML(change.help)
+        let rule = escapeXML(change.rule.name)
         return [
             "\t\t<error line=\"\(line)\" ",
             "column=\"\(col)\" ",

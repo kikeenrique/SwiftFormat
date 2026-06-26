@@ -32,7 +32,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class InferenceTests: XCTestCase {
+final class InferenceTests: XCTestCase {
     // MARK: indent
 
     func testInferIndentLevel() {
@@ -115,19 +115,19 @@ class InferenceTests: XCTestCase {
     func testInferAllowInlineSemicolons() {
         let input = "let foo = 5; let bar = 6"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertTrue(options.allowInlineSemicolons)
+        XCTAssertEqual(options.semicolons, .inlineOnly)
     }
 
     func testInferNoAllowInlineSemicolons() {
         let input = "let foo = 5\nlet bar = 6"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertFalse(options.allowInlineSemicolons)
+        XCTAssertEqual(options.semicolons, .never)
     }
 
     func testNoInferAllowInlineSemicolonsFromTerminatingSemicolon() {
         let input = "let foo = 5;\nlet bar = 6"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertFalse(options.allowInlineSemicolons)
+        XCTAssertEqual(options.semicolons, .never)
     }
 
     // MARK: useVoid
@@ -149,13 +149,13 @@ class InferenceTests: XCTestCase {
     func testInferTrailingCommas() {
         let input = "let foo = [\nbar,\n]\n let baz = [\nquux\n]"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertTrue(options.trailingCommas)
+        XCTAssertEqual(options.trailingCommas, .always)
     }
 
     func testInferNoTrailingCommas() {
         let input = "let foo = [\nbar\n]\n let baz = [\nquux\n]"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertFalse(options.trailingCommas)
+        XCTAssertEqual(options.trailingCommas, .never)
     }
 
     // MARK: truncateBlankLines
@@ -200,6 +200,24 @@ class InferenceTests: XCTestCase {
     func testInferIdententIfdefNoIndent() {
         let input = "{\n    {\n    #if foo\n    //foo\n    #endif\n    }\n}"
         let output = IndentMode.noIndent
+        let options = inferFormatOptions(from: tokenize(input))
+        XCTAssertEqual(options.ifdefIndent, output)
+    }
+
+    func testInferIfdefPreserve() {
+        let input = """
+        struct ContentView {
+            var body: some View {
+                Text("Example")
+                    .frame(maxWidth: 200)
+                    #if DEBUG
+                    .font(.body)
+                    #endif
+                    .padding()
+            }
+        }
+        """
+        let output = IndentMode.preserve
         let options = inferFormatOptions(from: tokenize(input))
         XCTAssertEqual(options.ifdefIndent, output)
     }
@@ -581,19 +599,19 @@ class InferenceTests: XCTestCase {
     func testInferElseOnNextLine() {
         let input = "if foo {\n}\nelse {}"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertTrue(options.elseOnNextLine)
+        XCTAssertEqual(options.elsePosition, .nextLine)
     }
 
     func testInferElseOnSameLine() {
         let input = "if foo {\n} else {}"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertFalse(options.elseOnNextLine)
+        XCTAssertEqual(options.elsePosition, .sameLine)
     }
 
     func testIgnoreInlineIfElse() {
         let input = "if foo {} else {}\nif foo {\n}\nelse {}"
         let options = inferFormatOptions(from: tokenize(input))
-        XCTAssertTrue(options.elseOnNextLine)
+        XCTAssertEqual(options.elsePosition, .nextLine)
     }
 
     // MARK: indentCase

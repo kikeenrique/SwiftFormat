@@ -11,10 +11,7 @@ import Foundation
 public extension FormatRule {
     /// Remove blank lines between import statements
     static let blankLinesBetweenImports = FormatRule(
-        help: """
-        Remove blank lines between import statements.
-        """,
-        disabledByDefault: true,
+        help: "Remove blank lines between import statements.",
         sharedOptions: ["linebreaks"]
     ) { formatter in
         formatter.forEach(.keyword("import")) { currentImportIndex, _ in
@@ -26,7 +23,13 @@ public extension FormatRule {
                 return
             }
 
-            formatter.replaceTokens(in: endOfLine ..< nextImportIndex, with: formatter.linebreakToken(for: currentImportIndex + 1))
+            // Preserve indentation at the start of the next import line
+            let nextLineIndent = formatter.currentIndentForLine(at: nextImportIndex)
+            var replacementTokens = [formatter.linebreakToken(for: currentImportIndex + 1)]
+            if !nextLineIndent.isEmpty {
+                replacementTokens.append(.space(nextLineIndent))
+            }
+            formatter.replaceTokens(in: endOfLine ..< nextImportIndex, with: replacementTokens)
         }
     } examples: {
         """

@@ -12,8 +12,8 @@ public extension FormatRule {
     /// Adds a blank line around MARK: comments
     static let blankLinesAroundMark = FormatRule(
         help: "Insert blank line before and after `MARK:` comments.",
-        options: ["lineaftermarks"],
-        sharedOptions: ["linebreaks"]
+        options: ["line-after-marks"],
+        sharedOptions: ["linebreaks", "type-blank-lines"]
     ) { formatter in
         formatter.forEachToken { i, token in
             guard case let .commentBody(comment) = token, comment.hasPrefix("MARK:"),
@@ -28,9 +28,19 @@ public extension FormatRule {
             }
             if formatter.options.insertBlankLines,
                let lastIndex = formatter.index(of: .linebreak, before: startIndex),
-               let lastToken = formatter.last(.nonSpace, before: lastIndex),
-               !lastToken.isLinebreak, lastToken != .startOfScope("{")
+               let lastToken = formatter.last(.nonSpaceOrComment, before: lastIndex),
+               !lastToken.isLinebreak
             {
+                if lastToken == .startOfScope("{"),
+                   formatter.options.enabledRules.contains(FormatRule.blankLinesAtStartOfScope.name)
+                {
+                    // If blankLinesAtStartOfScope is enabled, only insert a blank line if it
+                    // would not be removed by that rule (i.e. in a type body with insert or preserve option)
+                    guard let braceIndex = formatter.index(of: .nonSpaceOrComment, before: lastIndex),
+                          formatter.isStartOfTypeBody(at: braceIndex),
+                          formatter.options.typeBlankLines != .remove
+                    else { return }
+                }
                 formatter.insertLinebreak(at: lastIndex)
             }
         }

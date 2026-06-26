@@ -9,15 +9,25 @@
 import XCTest
 @testable import SwiftFormat
 
-class LinebreakAtEndOfFileTests: XCTestCase {
+final class LinebreakAtEndOfFileTests: XCTestCase {
     func testLinebreakAtEndOfFile() {
-        let input = "foo\nbar"
-        let output = "foo\nbar\n"
+        let input = """
+        foo
+        bar
+        """
+        let output = """
+        foo
+        bar
+
+        """
         testFormatting(for: input, output, rule: .linebreakAtEndOfFile)
     }
 
     func testNoLinebreakAtEndOfFragment() {
-        let input = "foo\nbar"
+        let input = """
+        foo
+        bar
+        """
         let options = FormatOptions(fragment: true)
         testFormatting(for: input, rule: .linebreakAtEndOfFile, options: options)
     }

@@ -12,7 +12,7 @@ public extension FormatRule {
     static let preferSwiftTesting = FormatRule(
         help: "Prefer the Swift Testing library over XCTest.",
         disabledByDefault: true,
-        options: ["xctestsymbols"]
+        options: ["xctest-symbols", "default-test-suite-attributes"]
     ) { formatter in
         // Swift Testing was introduced in Xcode 16.0 with Swift 6.0
         guard formatter.options.swiftVersion >= "6.0" else { return }
@@ -25,10 +25,20 @@ public extension FormatRule {
 
         let xcTestSuites = declarations
             .compactMap(\.asTypeDeclaration)
-            .filter { $0.conformances.contains(where: { $0.conformance == "XCTestCase" }) }
+            .filter { $0.conformances.contains(where: { $0.conformance.string == "XCTestCase" }) }
 
         guard !xcTestSuites.isEmpty,
               !xcTestSuites.contains(where: { $0.hasUnsupportedXCTestFunctionality() })
+        else { return }
+
+        // Find extensions of the test case types in the same file
+        let xcTestSuiteNames = Set(xcTestSuites.compactMap(\.name))
+        let xcTestSuiteExtensions = declarations
+            .compactMap(\.asTypeDeclaration)
+            .filter { $0.keyword == "extension" && xcTestSuiteNames.contains($0.name ?? "") }
+
+        // Check if any extension has unsupported functionality
+        guard !xcTestSuiteExtensions.contains(where: { $0.hasUnsupportedXCTestFunctionality() })
         else { return }
 
         // Replace `import XCTest` with `import Testing`.
@@ -43,7 +53,12 @@ public extension FormatRule {
         }
 
         for xcTestSuite in xcTestSuites {
-            xcTestSuite.convertXCTestCaseToSwiftTestingSuite()
+            xcTestSuite.convertToSwiftTestingSuite()
+        }
+
+        // Also convert test methods in extensions of the test case types
+        for xcTestSuiteExtension in xcTestSuiteExtensions {
+            xcTestSuiteExtension.convertToSwiftTestingSuite()
         }
 
         formatter.forEach(.identifier) { identifierIndex, token in
@@ -68,7 +83,6 @@ public extension FormatRule {
         -         XCTAssertNil(myFeature.crashReport)
         -     }
         - }
-        + @MainActor @Suite(.serialized)
         + final class MyFeatureTests { 
         +     @Test func myFeatureHasNoBugs() {
         +         let myFeature = MyFeature()
@@ -96,7 +110,6 @@ public extension FormatRule {
         -         XCTAssertEqual(myFeature.screens.count, 8)
         -     }
         - }
-        + @MainActor
         + final class MyFeatureTests {
         +     var myFeature: MyFeature!
         + 
@@ -119,7 +132,7 @@ public extension FormatRule {
     }
 }
 
-// MARK: XCTestCase test suite convesaion
+// MARK: XCTestCase test suite conversion
 
 extension TypeDeclaration {
     /// Whether or not this declaration uses XCTest functionality that is
@@ -151,32 +164,27 @@ extension TypeDeclaration {
         return false
     }
 
-    /// Converts this XCTestCase implementation to a Swift Testing test suite
-    func convertXCTestCaseToSwiftTestingSuite() {
-        // Remove the XCTestCase conformance
-        if let xcTestCaseConformance = conformances.first(where: { $0.conformance == "XCTestCase" }) {
-            formatter.removeConformance(at: xcTestCaseConformance.index)
-        }
+    /// Converts this XCTestCase implementation to a Swift Testing test suite.
+    /// For non-extension types, removes XCTestCase conformance and adds suite attributes.
+    /// For extensions, only converts test methods without modifying the type declaration.
+    func convertToSwiftTestingSuite() {
+        // Only remove conformance and add attributes for non-extension declarations
+        let isExtension = keyword == "extension"
 
-        // XCTest runs test serially, but Swift Testing defaults to running tests concurrently.
-        // For compatibility, have the generate Swift Testing suite default to running tests serially.
-        //
-        // Also from the XCTest to Swift Testing migration guide:
-        // https://developer.apple.com/documentation/testing/migratingfromxctest
-        // > XCTest runs synchronous test methods on the main actor by default,
-        // > while the testing library runs all test functions on an arbitrary task.
-        // > If a test function must run on the main thread, isolate it to the main actor
-        // > with @MainActor, or run the thread-sensitive code inside a call to
-        // > MainActor.run(resultType:body:).
-        //
-        // Moving test case to a background thread may cause failures, e.g. if
-        // the test case accesses any UIKit APIs, so we mark the test suite
-        // as @MainActor for maximum compatibility.
-        let startOfModifiers = formatter.startOfModifiers(at: keywordIndex, includingAttributes: true)
-        if !modifiers.contains("@MainActor") {
-            formatter.insert(tokenize("@MainActor @Suite(.serialized)\n"), at: startOfModifiers)
-        } else {
-            formatter.insert(tokenize("@Suite(.serialized)\n"), at: startOfModifiers)
+        if !isExtension {
+            // Remove the XCTestCase conformance
+            if let xcTestCaseConformance = conformances.first(where: { $0.conformance.string == "XCTestCase" }) {
+                formatter.removeConformance(at: xcTestCaseConformance.index)
+            }
+
+            // Allow the user to specify additional attributes to add to the new test suite,
+            // like `@MainActor`, `@Suite(.serialized)`, etc.
+            let attributesToAdd = formatter.options.defaultTestSuiteAttributes.joined(separator: " ")
+            if !attributesToAdd.isEmpty {
+                let startOfModifiers = formatter.startOfModifiers(at: keywordIndex, includingAttributes: true)
+                let attributesWithNewline = attributesToAdd + "\n"
+                formatter.insert(tokenize(attributesWithNewline), at: startOfModifiers)
+            }
         }
 
         let instanceMethods = body.filter { $0.keyword == "func" && !$0.modifiers.contains("static") }
@@ -382,7 +390,7 @@ extension Formatter {
             )
 
         case "XCTFail":
-            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall)
+            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall, preserveWhitespace: true)
             switch functionParams.count {
             case 0:
                 return tokenize("Issue.record()")
@@ -393,7 +401,7 @@ extension Formatter {
             }
 
         case "XCTUnwrap":
-            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall)
+            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall, preserveWhitespace: true)
             switch functionParams.count {
             case 1:
                 return tokenize("#require(\(functionParams[0].value))")
@@ -404,7 +412,7 @@ extension Formatter {
             }
 
         case "XCTAssertNoThrow":
-            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall)
+            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall, preserveWhitespace: true)
             switch functionParams.count {
             case 1:
                 return tokenize("#expect(throws: Never.self) { \(functionParams[0].value) }")
@@ -415,7 +423,7 @@ extension Formatter {
             }
 
         case "XCTAssertThrowsError":
-            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall)
+            let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall, preserveWhitespace: true)
 
             // Trailing closure variant is unsupported for now
             if let endOfFunctionCall = endOfScope(at: startOfFunctionCall),
@@ -444,7 +452,7 @@ extension Formatter {
         makeAssertion: (_ value: String) -> String
     ) -> [Token]? {
         guard let startOfFunctionCall = index(of: .nonSpaceOrComment, after: identifierIndex) else { return nil }
-        let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall)
+        let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall, preserveWhitespace: true)
 
         // All of the function params should be unlabeled
         guard functionParams.allSatisfy({ $0.label == nil }) else { return nil }
@@ -462,7 +470,7 @@ extension Formatter {
             return nil
         }
 
-        if let message = message {
+        if let message {
             return tokenize("#expect(\(makeAssertion(value)),\(message))")
         } else {
             return tokenize("#expect(\(makeAssertion(value)))")
@@ -476,7 +484,7 @@ extension Formatter {
         operator operatorToken: String
     ) -> [Token]? {
         guard let startOfFunctionCall = index(of: .nonSpaceOrComment, after: identifierIndex) else { return nil }
-        let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall)
+        let functionParams = parseFunctionCallArguments(startOfScope: startOfFunctionCall, preserveWhitespace: true)
 
         // All of the function params should be unlabeled
         guard functionParams.allSatisfy({ $0.label == nil }) else { return nil }
@@ -497,7 +505,7 @@ extension Formatter {
             return nil
         }
 
-        if let message = message {
+        if let message {
             return tokenize("#expect(\(lhs) \(operatorToken)\(rhs),\(message))")
         } else {
             return tokenize("#expect(\(lhs) \(operatorToken)\(rhs))")

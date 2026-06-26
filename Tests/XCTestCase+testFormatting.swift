@@ -82,13 +82,16 @@ extension XCTestCase {
             .markTypes,
             .blockComments,
             .unusedPrivateDeclarations,
+            .preferFinalClasses,
+            .preferExplicitFalse,
+            .wrapCaseBodies,
         ]
         let exclude = exclude + defaultExclusions.filter { !rules.contains($0) }
         let formatResult: (output: String, changes: [SwiftFormat.Formatter.Change])
         do {
             formatResult = try format(input, rules: rules, options: options)
         } catch {
-            XCTFail("Failed to format input, threw error \(error)")
+            XCTFail("Failed to format input, threw error \(error)", file: file, line: line)
             return
         }
         XCTAssertEqual(formatResult.output, output, file: file, line: line)

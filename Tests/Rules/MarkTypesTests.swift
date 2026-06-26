@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class MarkTypesTests: XCTestCase {
+final class MarkTypesTests: XCTestCase {
     func testAddsMarkBeforeTypes() {
         let input = """
         struct Foo {}
@@ -110,21 +110,14 @@ class MarkTypesTests: XCTestCase {
         testFormatting(for: input, output, rule: .markTypes, exclude: [.emptyExtensions])
     }
 
-    func testCustomTypeMark() {
+    func testFragment() {
         let input = """
         struct Foo {}
         extension Foo {}
         """
 
-        let output = """
-        // TYPE DEFINITION: Foo
-
-        struct Foo {}
-        extension Foo {}
-        """
-
         testFormatting(
-            for: input, output, rule: .markTypes,
+            for: input, rule: .markTypes,
             options: FormatOptions(typeMarkComment: "TYPE DEFINITION: %t", fragment: true),
             exclude: [.emptyExtensions]
         )
@@ -853,14 +846,14 @@ class MarkTypesTests: XCTestCase {
         """
 
         // Initialize rule names
-        let _ = FormatRules.byName
+        _ = FormatRules.byName
         let changes = try lint(input, rules: [.markTypes])
         XCTAssertEqual(changes, [
             .init(line: 1, rule: .markTypes, filePath: nil, isMove: false),
         ])
     }
 
-    func testComplexTypeNames() throws {
+    func testComplexTypeNames() {
         let input = """
         extension [Foo]: TestProtocol {
             func test() {}
@@ -1002,5 +995,35 @@ class MarkTypesTests: XCTestCase {
         """
 
         testFormatting(for: input, output, rule: .markTypes)
+    }
+
+    func testMarksTypeAfterExtension() {
+        let input = """
+        extension Foo {
+            var foo: Foo { Foo() }
+            var bar: Bar { Bar() }
+        }
+
+        struct Baaz {
+            let foo: Foo
+            let bar: Bar
+        }
+        """
+
+        let output = """
+        extension Foo {
+            var foo: Foo { Foo() }
+            var bar: Bar { Bar() }
+        }
+
+        // MARK: - Baaz
+
+        struct Baaz {
+            let foo: Foo
+            let bar: Bar
+        }
+        """
+
+        testFormatting(for: input, output, rule: .markTypes, exclude: [.wrapPropertyBodies])
     }
 }

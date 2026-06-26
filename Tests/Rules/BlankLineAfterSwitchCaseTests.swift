@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class BlankLineAfterSwitchCaseTests: XCTestCase {
+final class BlankLineAfterSwitchCaseTests: XCTestCase {
     func testAddsBlankLineAfterMultilineSwitchCases() {
         let input = """
         func handle(_ action: SpaceshipAction) {
@@ -44,6 +44,39 @@ class BlankLineAfterSwitchCaseTests: XCTestCase {
         }
         """
         testFormatting(for: input, output, rule: .blankLineAfterSwitchCase)
+    }
+
+    func testAddsBlankLineAfterSingleSwitchCasesWhenBlankLineAroundSingleLineCases() {
+        let input = """
+        func handle(_ action: SpaceshipAction) {
+            switch action {
+            // The warp drive can be engaged by pressing a button on the control panel
+            case .engageWarpDrive:
+                warpDrive.activate()
+            // Triggered automatically whenever we detect an energy blast was fired in our direction
+            case .handleIncomingEnergyBlast:
+                energyShields.engage()
+            }
+        }
+        """
+
+        let output = """
+        func handle(_ action: SpaceshipAction) {
+            switch action {
+            // The warp drive can be engaged by pressing a button on the control panel
+            case .engageWarpDrive:
+                warpDrive.activate()
+
+            // Triggered automatically whenever we detect an energy blast was fired in our direction
+            case .handleIncomingEnergyBlast:
+                energyShields.engage()
+            }
+        }
+        """
+        testFormatting(for: input,
+                       output,
+                       rule: .blankLineAfterSwitchCase,
+                       options: FormatOptions(blankLineAfterSwitchCase: .always))
     }
 
     func testRemovesBlankLineAfterLastSwitchCase() {
@@ -209,5 +242,165 @@ class BlankLineAfterSwitchCaseTests: XCTestCase {
         """
 
         testFormatting(for: input, rule: .blankLineAfterSwitchCase)
+    }
+
+    func testAddsBlankLineAfterMultilineSwitchCaseWithIfdefBlock() {
+        let input = """
+        switch action {
+        case .engageWarpDrive:
+            navigationComputer.destination = targetedDestination
+            await warpDrive.spinUp()
+            warpDrive.activate()
+        #if CLOAKING
+            case .engageCloakingDevice:
+                await cloakingDevice.spinUp()
+                cloakingDevice.activate()
+        #endif
+        case .handleIncomingEnergyBlast:
+            await energyShields.prepare()
+            energyShields.engage()
+        }
+        """
+
+        let output = """
+        switch action {
+        case .engageWarpDrive:
+            navigationComputer.destination = targetedDestination
+            await warpDrive.spinUp()
+            warpDrive.activate()
+
+        #if CLOAKING
+            case .engageCloakingDevice:
+                await cloakingDevice.spinUp()
+                cloakingDevice.activate()
+        #endif
+
+        case .handleIncomingEnergyBlast:
+            await energyShields.prepare()
+            energyShields.engage()
+        }
+        """
+        testFormatting(for: input, output, rule: .blankLineAfterSwitchCase, exclude: [.consistentSwitchCaseSpacing])
+    }
+
+    func testAddsBlankLineAfterMultilineSwitchCaseInsideIfdefBlock() {
+        // A multi-line case inside a #if block gets a blank line inserted after the #endif.
+        let input = """
+        switch action {
+        case .engageWarpDrive:
+            warpDrive.activate()
+        #if CLOAKING
+            case .engageCloakingDevice:
+                cloakingDevice.spinUp()
+                cloakingDevice.activate()
+        #endif
+        case .handleIncomingEnergyBlast:
+            energyShields.engage()
+        }
+        """
+
+        let output = """
+        switch action {
+        case .engageWarpDrive:
+            warpDrive.activate()
+        #if CLOAKING
+            case .engageCloakingDevice:
+                cloakingDevice.spinUp()
+                cloakingDevice.activate()
+        #endif
+
+        case .handleIncomingEnergyBlast:
+            energyShields.engage()
+        }
+        """
+        testFormatting(for: input, output, rule: .blankLineAfterSwitchCase, exclude: [.consistentSwitchCaseSpacing])
+    }
+
+    func testDoesntAddBlankLineForCasesInIfElseBlock() {
+        let input = """
+        switch action {
+        #if CLOAKING
+            case .engageCloakingDevice:
+                cloakingDevice.activate()
+        #else
+            case .handleIncomingEnergyBlast:
+                energyShields.engage()
+        #endif
+        }
+        """
+
+        testFormatting(for: input, rule: .blankLineAfterSwitchCase)
+    }
+
+    func testNoBlankLineInsertedBeforeIfdefInsideSwitchCase() {
+        let input = """
+        switch foo {
+        case .bar:
+            #if DEBUG
+                print("foo")
+            #endif
+            print("bar")
+
+        case .baaz:
+            print("baaz")
+        }
+        """
+
+        testFormatting(for: input, rule: .blankLineAfterSwitchCase)
+    }
+
+    func testNoBlankLineInsertedBeforeIfdefWithNestedSwitchInsideCase() {
+        let input = """
+        switch foo {
+        case .bar:
+            #if DEBUG
+                switch nested {
+                case .a:
+                    print("a")
+                case .b:
+                    print("b")
+                }
+            #endif
+            print("bar")
+
+        case .baaz:
+            print("baaz")
+        }
+        """
+
+        testFormatting(for: input, rule: .blankLineAfterSwitchCase)
+    }
+
+    func testBlankLineAfterMultilineSwitchCaseWithIfdefInsideCase() {
+        let input = """
+        switch foo {
+        case .bar:
+            #if DEBUG
+                print("foo")
+            #endif
+            print("bar")
+        case .baaz:
+            print("baaz")
+        case .quux:
+            print("quux")
+        }
+        """
+
+        let output = """
+        switch foo {
+        case .bar:
+            #if DEBUG
+                print("foo")
+            #endif
+            print("bar")
+
+        case .baaz:
+            print("baaz")
+        case .quux:
+            print("quux")
+        }
+        """
+
+        testFormatting(for: input, output, rule: .blankLineAfterSwitchCase, exclude: [.consistentSwitchCaseSpacing])
     }
 }

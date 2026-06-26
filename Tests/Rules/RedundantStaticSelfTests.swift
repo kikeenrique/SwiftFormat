@@ -9,17 +9,25 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantStaticSelfTests: XCTestCase {
+final class RedundantStaticSelfTests: XCTestCase {
     func testRedundantStaticSelfInStaticVar() {
-        let input = "enum E { static var x: Int { Self.y } }"
-        let output = "enum E { static var x: Int { y } }"
-        testFormatting(for: input, output, rule: .redundantStaticSelf)
+        let input = """
+        enum E { static var x: Int { Self.y } }
+        """
+        let output = """
+        enum E { static var x: Int { y } }
+        """
+        testFormatting(for: input, output, rule: .redundantStaticSelf, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testRedundantStaticSelfInStaticMethod() {
-        let input = "enum E { static func foo() { Self.bar() } }"
-        let output = "enum E { static func foo() { bar() } }"
-        testFormatting(for: input, output, rule: .redundantStaticSelf)
+        let input = """
+        enum E { static func foo() { Self.bar() } }
+        """
+        let output = """
+        enum E { static func foo() { bar() } }
+        """
+        testFormatting(for: input, output, rule: .redundantStaticSelf, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testRedundantStaticSelfOnNextLine() {
@@ -42,9 +50,13 @@ class RedundantStaticSelfTests: XCTestCase {
     }
 
     func testRedundantStaticSelfWithReturn() {
-        let input = "enum E { static func foo() { return Self.bar() } }"
-        let output = "enum E { static func foo() { return bar() } }"
-        testFormatting(for: input, output, rule: .redundantStaticSelf)
+        let input = """
+        enum E { static func foo() { return Self.bar() } }
+        """
+        let output = """
+        enum E { static func foo() { return bar() } }
+        """
+        testFormatting(for: input, output, rule: .redundantStaticSelf, exclude: [.wrapFunctionBodies])
     }
 
     func testRedundantStaticSelfInConditional() {
@@ -79,16 +91,7 @@ class RedundantStaticSelfTests: XCTestCase {
             }
         }
         """
-        let output = """
-        enum E {
-            static func foo() {
-                func bar() {
-                    foo()
-                }
-            }
-        }
-        """
-        testFormatting(for: input, output, rule: .redundantStaticSelf)
+        testFormatting(for: input, rule: .redundantStaticSelf)
     }
 
     func testRedundantStaticSelfInNestedType() {
@@ -108,17 +111,21 @@ class RedundantStaticSelfTests: XCTestCase {
             }
         }
         """
-        testFormatting(for: input, output, rule: .redundantStaticSelf)
+        testFormatting(for: input, output, rule: .redundantStaticSelf, exclude: [.wrapFunctionBodies])
     }
 
     func testStaticSelfNotRemovedWhenUsedAsImplicitInitializer() {
-        let input = "enum E { static func foo() { Self().bar() } }"
-        testFormatting(for: input, rule: .redundantStaticSelf)
+        let input = """
+        enum E { static func foo() { Self().bar() } }
+        """
+        testFormatting(for: input, rule: .redundantStaticSelf, exclude: [.wrapFunctionBodies])
     }
 
     func testStaticSelfNotRemovedWhenUsedAsExplicitInitializer() {
-        let input = "enum E { static func foo() { Self.init().bar() } }"
-        testFormatting(for: input, rule: .redundantStaticSelf, exclude: [.redundantInit])
+        let input = """
+        enum E { static func foo() { Self.init().bar() } }
+        """
+        testFormatting(for: input, rule: .redundantStaticSelf, exclude: [.redundantInit, .wrapFunctionBodies])
     }
 
     func testPreservesStaticSelfInFunctionAfterStaticVar() {
@@ -222,6 +229,39 @@ class RedundantStaticSelfTests: XCTestCase {
         let input = """
         class A { static let defaultName = "A"; let name: String; init() { name = Self.defaultName }}
         """
+        testFormatting(for: input, rule: .redundantStaticSelf, exclude: [.wrapFunctionBodies])
+    }
+
+    func testPreserveStaticSelfInClosureInsideStaticFunc() {
+        let input = """
+        enum XError: Error {
+            case error(String, cause: (any Error)? = nil)
+
+            static func error(_ message: String, cause: String?) -> Self {
+                .error(message, cause: cause.map { Self.error($0) })
+            }
+        }
+        """
         testFormatting(for: input, rule: .redundantStaticSelf)
+    }
+
+    func testRedundantStaticSelfRemovedOutsideClosureInsideStaticFunc() {
+        let input = """
+        enum E {
+            static func foo() {
+                Self.bar()
+                let x = { Self.bar() }
+            }
+        }
+        """
+        let output = """
+        enum E {
+            static func foo() {
+                bar()
+                let x = { Self.bar() }
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .redundantStaticSelf)
     }
 }

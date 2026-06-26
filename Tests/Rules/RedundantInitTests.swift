@@ -9,57 +9,83 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantInitTests: XCTestCase {
+final class RedundantInitTests: XCTestCase {
     func testRemoveRedundantInit() {
-        let input = "[1].flatMap { String.init($0) }"
-        let output = "[1].flatMap { String($0) }"
+        let input = """
+        [1].flatMap { String.init($0) }
+        """
+        let output = """
+        [1].flatMap { String($0) }
+        """
         testFormatting(for: input, output, rule: .redundantInit)
     }
 
     func testRemoveRedundantInit2() {
-        let input = "[String.self].map { Type in Type.init(foo: 1) }"
-        let output = "[String.self].map { Type in Type(foo: 1) }"
+        let input = """
+        [String.self].map { Type in Type.init(foo: 1) }
+        """
+        let output = """
+        [String.self].map { Type in Type(foo: 1) }
+        """
         testFormatting(for: input, output, rule: .redundantInit)
     }
 
     func testRemoveRedundantInit3() {
-        let input = "String.init(\"text\")"
-        let output = "String(\"text\")"
+        let input = """
+        String.init(\"text\")
+        """
+        let output = """
+        String(\"text\")
+        """
         testFormatting(for: input, output, rule: .redundantInit)
     }
 
     func testDontRemoveInitInSuperCall() {
-        let input = "class C: NSObject { override init() { super.init() } }"
-        testFormatting(for: input, rule: .redundantInit)
+        let input = """
+        class C: NSObject { override init() { super.init() } }
+        """
+        testFormatting(for: input, rule: .redundantInit, exclude: [.wrapFunctionBodies])
     }
 
     func testDontRemoveInitInSelfCall() {
-        let input = "struct S { let n: Int }; extension S { init() { self.init(n: 1) } }"
-        testFormatting(for: input, rule: .redundantInit)
+        let input = """
+        struct S { let n: Int }; extension S { init() { self.init(n: 1) } }
+        """
+        testFormatting(for: input, rule: .redundantInit, exclude: [.wrapFunctionBodies])
     }
 
     func testDontRemoveInitWhenPassedAsFunction() {
-        let input = "[1].flatMap(String.init)"
+        let input = """
+        [1].flatMap(String.init)
+        """
         testFormatting(for: input, rule: .redundantInit)
     }
 
     func testDontRemoveInitWhenUsedOnMetatype() {
-        let input = "[String.self].map { type in type.init(1) }"
+        let input = """
+        [String.self].map { type in type.init(1) }
+        """
         testFormatting(for: input, rule: .redundantInit)
     }
 
     func testDontRemoveInitWhenUsedOnImplicitClosureMetatype() {
-        let input = "[String.self].map { $0.init(1) }"
+        let input = """
+        [String.self].map { $0.init(1) }
+        """
         testFormatting(for: input, rule: .redundantInit)
     }
 
     func testDontRemoveInitWhenUsedOnPossibleMetatype() {
-        let input = "let something = Foo.bar.init()"
+        let input = """
+        let something = Foo.bar.init()
+        """
         testFormatting(for: input, rule: .redundantInit)
     }
 
     func testDontRemoveInitWithExplicitSignature() {
-        let input = "[String.self].map(Foo.init(bar:))"
+        let input = """
+        [String.self].map(Foo.init(bar:))
+        """
         testFormatting(for: input, rule: .redundantInit)
     }
 
@@ -172,7 +198,23 @@ class RedundantInitTests: XCTestCase {
         let input = """
         type(of: oldViewController).init()
         """
+        testFormatting(for: input, rule: .redundantInit)
+    }
 
+    func testPreserveAsTypeInit() {
+        let input = """
+        let foo = (MyType.self as NSObject.Type).init()
+        let bar = (MyType.self as? NSObject.Type).init()
+        """
+        testFormatting(for: input, rule: .redundantInit)
+    }
+
+    func testDontMangleSelfInitExpressions() {
+        let input = """
+        // TODO: maybe we can auto-simplify in this case?
+        let foo = MyType.self.init()
+        let bar = (MyType.self).init()
+        """
         testFormatting(for: input, rule: .redundantInit)
     }
 
@@ -219,5 +261,76 @@ class RedundantInitTests: XCTestCase {
         let bar: Bar = (foo.isBar && bar.isBaaz) ? .init() : nil
         """
         testFormatting(for: input, rule: .redundantInit)
+    }
+
+    func testRemoveRedundantInitBeforeTrailingClosure() {
+        let input = """
+        Handler.init { print("foo") }
+        """
+        let output = """
+        Handler { print("foo") }
+        """
+        testFormatting(for: input, output, rule: .redundantInit)
+    }
+
+    func testInitOnOwnLine() {
+        let input = """
+        let foo = String
+            .init()
+        """
+        let output = """
+        let foo = String()
+        """
+        testFormatting(for: input, output, rule: .redundantInit, exclude: [.propertyTypes])
+    }
+
+    func testInitOnOwnLine2() {
+        let input = """
+        let foo = String /*
+             comment
+            */ .init()
+        """
+        let output = """
+        let foo = String()
+        """
+        testFormatting(for: input, output, rule: .redundantInit, exclude: [.propertyTypes])
+    }
+
+    func testPreserveInitOnCollectionTypeWithTrailingClosureBeforeSwift64() {
+        let input = """
+        [String].init { "foo" }
+        [String: Int].init { ("key", 1) }
+        [[String]].init { ["foo"] }
+        """
+        let options = FormatOptions(swiftVersion: "6.3")
+        testFormatting(for: input, rule: .redundantInit, options: options)
+    }
+
+    func testRemoveInitOnCollectionTypeWithTrailingClosureInSwift64() {
+        let input = """
+        [String].init { "foo" }
+        [String: Int].init { ("key", 1) }
+        [[String]].init { ["foo"] }
+        """
+        let output = """
+        [String] { "foo" }
+        [String: Int] { ("key", 1) }
+        [[String]] { ["foo"] }
+        """
+        let options = FormatOptions(swiftVersion: "6.4")
+        testFormatting(for: input, output, rule: .redundantInit, options: options)
+    }
+
+    func testRemoveInitOnCollectionTypeWithParensUnaffectedBySwiftVersion() {
+        let input = """
+        let array = [String].init()
+        let dictionary = [String: Int].init()
+        """
+        let output = """
+        let array = [String]()
+        let dictionary = [String: Int]()
+        """
+        let options = FormatOptions(swiftVersion: "6.3")
+        testFormatting(for: input, output, rule: .redundantInit, options: options, exclude: [.propertyTypes])
     }
 }

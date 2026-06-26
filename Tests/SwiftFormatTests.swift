@@ -32,13 +32,13 @@
 import XCTest
 @testable import SwiftFormat
 
-class SwiftFormatTests: XCTestCase {
+final class SwiftFormatTests: XCTestCase {
     // MARK: enumerateFiles
 
     func testInputFileMatchesOutputFileForNilOutput() {
         var files = [URL]()
         let inputURL = URL(fileURLWithPath: #file)
-        let errors = enumerateFiles(withInputURL: inputURL) { inputURL, outputURL, _ in
+        let errors = enumerateFiles(withInputURLs: [inputURL]) { inputURL, outputURL, _ in
             XCTAssertEqual(inputURL, outputURL)
             XCTAssertEqual(inputURL, URL(fileURLWithPath: #file))
             return { files.append(inputURL) }
@@ -50,7 +50,7 @@ class SwiftFormatTests: XCTestCase {
     func testInputFileMatchesOutputFileForSameOutput() {
         var files = [URL]()
         let inputURL = URL(fileURLWithPath: #file)
-        let errors = enumerateFiles(withInputURL: inputURL, outputURL: inputURL) { inputURL, outputURL, _ in
+        let errors = enumerateFiles(withInputURLs: [inputURL], outputURL: inputURL) { inputURL, outputURL, _ in
             XCTAssertEqual(inputURL, outputURL)
             XCTAssertEqual(inputURL, URL(fileURLWithPath: #file))
             return { files.append(inputURL) }
@@ -62,7 +62,7 @@ class SwiftFormatTests: XCTestCase {
     func testInputFilesMatchOutputFilesForNilOutput() {
         var files = [URL]()
         let inputURL = URL(fileURLWithPath: #file).deletingLastPathComponent().deletingLastPathComponent()
-        let errors = enumerateFiles(withInputURL: inputURL) { inputURL, outputURL, _ in
+        let errors = enumerateFiles(withInputURLs: [inputURL]) { inputURL, outputURL, _ in
             XCTAssertEqual(inputURL, outputURL)
             return { files.append(inputURL) }
         }
@@ -73,7 +73,7 @@ class SwiftFormatTests: XCTestCase {
     func testInputFilesMatchOutputFilesForSameOutput() {
         var files = [URL]()
         let inputURL = URL(fileURLWithPath: #file).deletingLastPathComponent().deletingLastPathComponent()
-        let errors = enumerateFiles(withInputURL: inputURL, outputURL: inputURL) { inputURL, outputURL, _ in
+        let errors = enumerateFiles(withInputURLs: [inputURL], outputURL: inputURL) { inputURL, outputURL, _ in
             XCTAssertEqual(inputURL, outputURL)
             return { files.append(inputURL) }
         }
@@ -88,14 +88,14 @@ class SwiftFormatTests: XCTestCase {
             Glob.path(currentFile.deletingLastPathComponent().path),
         ]))
         let inputURL = currentFile.deletingLastPathComponent().deletingLastPathComponent()
-        let errors = enumerateFiles(withInputURL: inputURL, outputURL: inputURL, options: options) { inputURL, outputURL, _ in
+        let errors = enumerateFiles(withInputURLs: [inputURL], outputURL: inputURL, options: options) { inputURL, outputURL, _ in
             XCTAssertEqual(inputURL, outputURL)
             return { files.append(inputURL) }
         }
 
         var allFiles = [URL]()
         let allFilesInputURL = URL(fileURLWithPath: #file).deletingLastPathComponent().deletingLastPathComponent()
-        _ = enumerateFiles(withInputURL: allFilesInputURL, outputURL: allFilesInputURL) { inputURL, outputURL, _ in
+        _ = enumerateFiles(withInputURLs: [allFilesInputURL], outputURL: allFilesInputURL) { inputURL, outputURL, _ in
             XCTAssertEqual(inputURL, outputURL)
             return { allFiles.append(inputURL) }
         }
@@ -153,33 +153,6 @@ class SwiftFormatTests: XCTestCase {
         let input = "foo () {"
         let options = FormatOptions(fragment: true)
         XCTAssertEqual(try format(input, rules: [], options: options).output, input)
-    }
-
-    // MARK: format line range
-
-    func testFormattingRange() {
-        let input = """
-        let  badlySpaced1:Int   = 5
-        let   badlySpaced2:Int=5
-        let   badlySpaced3 : Int = 5
-        """
-        let output = """
-        let  badlySpaced1:Int   = 5
-        let badlySpaced2: Int = 5
-        let   badlySpaced3 : Int = 5
-        """
-        XCTAssertEqual(try format(input, lineRange: 2 ... 2).output, output)
-    }
-
-    func testFormattingRangeNoCrash() {
-        let input = """
-        func foo() {
-          if bar {
-            print(  "foo")
-          }
-        }
-        """
-        XCTAssertNoThrow(try format(input, lineRange: 3 ... 4))
     }
 
     // MARK: conflict markers
@@ -264,7 +237,7 @@ class SwiftFormatTests: XCTestCase {
 
     func testTokenRange() {
         let tokens = tokenize("// a comment\n    let foo = 5\n")
-        XCTAssertEqual(tokenRange(forLineRange: 1 ... 1, in: tokens), 0 ..< 4)
+        XCTAssertEqual(tokenRange(forLineRange: 1 ... 1, in: tokens), 0 ..< 3)
     }
 
     // MARK: newOffset

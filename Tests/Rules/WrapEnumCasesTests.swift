@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class WrapEnumCasesTests: XCTestCase {
+final class WrapEnumCasesTests: XCTestCase {
     func testMultilineEnumCases() {
         let input = """
         enum Enum1: Int {
@@ -167,7 +167,9 @@ class WrapEnumCasesTests: XCTestCase {
     }
 
     func testNoWrapEnumStatementAllOnOneLine() {
-        let input = "enum Foo { bar, baz }"
+        let input = """
+        enum Foo { bar, baz }
+        """
         testFormatting(for: input, rule: .wrapEnumCases)
     }
 
@@ -223,7 +225,9 @@ class WrapEnumCasesTests: XCTestCase {
     }
 
     func testNoWrapSingleLineEnumCases() {
-        let input = "enum Foo { case foo, bar }"
+        let input = """
+        enum Foo { case foo, bar }
+        """
         testFormatting(for: input, rule: .wrapEnumCases)
     }
 
@@ -268,6 +272,29 @@ class WrapEnumCasesTests: XCTestCase {
         }
         """
 
+        testFormatting(for: input, output, rule: .wrapEnumCases)
+    }
+
+    func testPackageEnumWithProtocolConformances() {
+        let input = """
+        enum Outer {
+            case outerCase, otherOuterCase
+
+            package enum Inner: String, CaseIterable, Codable {
+                case innerCase
+            }
+        }
+        """
+        let output = """
+        enum Outer {
+            case outerCase
+            case otherOuterCase
+
+            package enum Inner: String, CaseIterable, Codable {
+                case innerCase
+            }
+        }
+        """
         testFormatting(for: input, output, rule: .wrapEnumCases)
     }
 }

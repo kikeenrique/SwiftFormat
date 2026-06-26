@@ -9,28 +9,44 @@
 import XCTest
 @testable import SwiftFormat
 
-class SpaceAroundCommentsTests: XCTestCase {
+final class SpaceAroundCommentsTests: XCTestCase {
     func testSpaceAroundCommentInParens() {
-        let input = "(/* foo */)"
-        let output = "( /* foo */ )"
+        let input = """
+        (/* foo */)
+        """
+        let output = """
+        ( /* foo */ )
+        """
         testFormatting(for: input, output, rule: .spaceAroundComments,
                        exclude: [.redundantParens])
     }
 
     func testNoSpaceAroundCommentAtStartAndEndOfFile() {
-        let input = "/* foo */"
+        let input = """
+        /* foo */
+        """
         testFormatting(for: input, rule: .spaceAroundComments)
     }
 
     func testNoSpaceAroundCommentBeforeComma() {
-        let input = "(foo /* foo */ , bar)"
-        let output = "(foo /* foo */, bar)"
+        let input = """
+        (foo /* foo */ , bar)
+        """
+        let output = """
+        (foo /* foo */, bar)
+        """
         testFormatting(for: input, output, rule: .spaceAroundComments)
     }
 
     func testSpaceAroundSingleLineComment() {
-        let input = "func foo() {// comment\n}"
-        let output = "func foo() { // comment\n}"
+        let input = """
+        func foo() {// comment
+        }
+        """
+        let output = """
+        func foo() { // comment
+        }
+        """
         testFormatting(for: input, output, rule: .spaceAroundComments)
     }
 }

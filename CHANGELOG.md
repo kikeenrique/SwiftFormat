@@ -1,5 +1,247 @@
 # Change Log
 
+## [0.61.1](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.61.1) (2026-04-27)
+
+- Fixed race condition when parsing config files
+- Fixed `redundantStaticSelf` false positive inside closures and nested functions
+- Fixed `unsafe` keyword dot-spacing edge case
+- Fixed `redundantSelf` crash on switch expression inside if-let binding chain
+- Fixed `redundantEquatable` removing manual `==` for types with `Any.Type` stored properties
+
+## [0.61.0](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.61.0) (2026-04-11)
+
+- Added `wrapCaseBodies` rule
+- Added `redundantEmptyView` rule
+- Added `preferSwiftStringAPI` rule
+- Added `--test-case-access-control` option for `testSuiteAccessControl` rule
+- Updated `sortImports` to support `--import-grouping length,alpha`
+- Updated `--self-required` to support assignment type names like `OSLogMessage`
+- Updated `--suite-name-format` default value to `preserve`
+- Fixed conditional import parsing with access modifiers
+- Fixed infinite loop in `organizeDeclarations` when opening brace has a trailing comment
+- Fixed closing brace indentation with `--trimwhitespace nonblank-lines`
+- Fixed indentation of multiline raw string literals with `--indent-strings`
+- Fixed `redundantParens` incorrectly removing `()` from `@MainActor` closure signatures
+- Fixed wrapping inside parens of function declarations with no parameters
+- Fixed `extensionAccessControl` incorrectly hoisting `public` onto extensions of nested internal types
+- Fixed `spaceAroundParens` incorrectly removing space after `nonisolated(nonsending)` modifier
+- Fixed `noGuardInTests` incorrectly transforming `guard #available` conditions
+- Fixed trailing comma for `@convention` closures
+- Fixed number handling in Swift Testing test case name conversion
+- Fixed `redundantSelf` inserting `self.` inside `#if`/`#elseif` compiler directive conditions
+
+## [0.60.1](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.60.1) (2026-03-07)
+
+- Fixed issue where `redundantSendable` rule would unexpectedly remove `Sendable` conformance on type defined in public extension
+- Fixed issue where `redundantSendable` rule would leave behind extra space when removing `:`
+- Renamed `redundantProperty` rule to `redundantVariable`
+- Updated `redundantVariable` rule to preserve variables with explicit type annotations
+- Updated `enumNamespaces` rule to preserve Swift Testing suites as structs
+
+## [0.60.0](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.60.0) (2026-03-03)
+
+- Added `redundantSwiftTestingSuite` rule
+- Added `redundantSendable` rule
+- Added `preferExplicitFalse` rule
+- Added support for `::` module selector syntax
+- Added support for value generics syntax
+- Updated `swiftTestingTestCaseNames` to use raw identifiers by default
+- Updated `swiftTestingTestCaseNames` to use UpperCamelCase for test suite names
+- Updated `redundantSelf` to handle `guard` statements
+- Updated `unusedArguments` to handle for loop variables
+- Updated `redundantType` to better handle `Set` literals
+- Updated `redundantParents` to remove empty parens from attributes
+- Updated `sortImports` to sort imports by access control
+- Updated `blankLinesBetweenImports` to preserve indentation when indent disabled
+- Updated `unusedPrivateDeclaration` rule to preserve private `@Test` functions
+- Updated `preferSwiftTesting` rule to convert tests in extensions within the same file
+- Updated `--stdin-path` to not require the file to actually exist
+- Updated `simplifyGenericConstraints` to avoid adding duplicate constraints
+- Updated `blankLinesAroundMark` to insert blank line before MARK at start of scope when allowed by `blankLinesAtStartOfScope` config
+- Updated `redundantEquatable` to preserve `==` implementation in types with `Strideable` conformance
+- Fixed handling of switch statements with `#if` blocks in several rules
+- Fixed issue where `async` function declarations were wrapped using `wrapArguments` instead of `wrapParameters`
+- Fixed issue where `redundantViewBuilder` would remove `@ViewBuilder` from protocol members
+- Fixed `redundantSelf` parsing issue with throwing closure return types and switch expressions in `if let` condition
+- Fixed `trailingCommas` rule incorrectly adding commas to if `#available` checks
+- Fixed `guard...else` indentation in `wrapArguments` with `wrap-conditions`
+- Fixed issue where `simplifyGenericConstraints` would leave dangling `where` keyword in protocol members
+- Fixed issue where `trailingCommas` didn't handle closure capture lists with macro expressions
+- Fixed indentation for closure parameters on separate lines
+- Fixed issue where `.init` would be removed in code like `[Foo].init { ... }` (not supported until Swift 6.4).
+- Fixed issue where `.swift-version` files were read from excluded directories
+- Fixed incorrect replacement of `&&` operator with `,` inside a ternary condition
+- Fixed `unusedArguments` bug in code with `try? await`
+- Fixed handling of `MainActor` attributes in `redundantViewBuilder`
+
+## [0.59.1](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.59.1) (2026-01-29)
+
+- Reverted changes to `indent` rule `--ifdef` handling from 0.59.0
+- Updated `docComments` rule to use doc comments on nested functions and handle conditional compilation blocks in function bodies
+- Updated `spaceAroundBrackets` to preserve space between global actor attribute and closure capture list
+- Updated `redundantMemberwiseInit` to preserve inits with attributes
+- Fixed handling of `any` keyword in `sortTypealiases` rule
+- Resolved build issue related to macOS 13 SDK availability
+
+## [0.59.0](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.59.0) (2026-01-25)
+
+- Added `simplifyGenericConstraints` rule
+- Added `validateTestCases` rule
+- Added `testSuiteAccessControl` rule
+- Added `wrapPropertyBodies` rule
+- Added `wrapFunctionBodies` rule
+- Added `redundantViewBuilder` rule
+- Added `--ifdef preserve` option to `indent` rule
+- Added `--prefer-synthesized-init-for-internal-structs` option to `redundantMemberwiseInit` rule
+- Enabled more rules by default: `blankLinesBetweenImports`, `docComments`, `emptyExtensions`, `environmentEntry`, `noForceTryInTests`, `noForceUnwrapInTests`, `redundantAsync`, `redundantEquatable`, `redundantMemberwiseInit`, `redundantProperty`, `redundantThrows`
+- Updated `typeSugar` to only preserve explicit `Optional<T>` in structs with a synthesized memberwise initializer
+- Updated closing paren of single-argument functions and collections to wrap if needed
+- Updated `redundantMemberwiseInit` rule to support result builder attributes
+- Improved how `organizeDeclarations` handles structs with a synthesized memberwise initializer
+- Updated `docComments` rule to preserve formatting of comments with directives
+- Fixed `--ifdef no-indent` handling of method chains and nested directives
+- Fixed issue where `XMLReporter` did not properly escape strings
+- Fixed support for `unsafe` keyword
+- Fixed edge cases in `spaceAroundBrackets` rule
+- Fixed crash in `sortTypealiases` rule
+- Fixed issue where `redundantSelf` rule could crash if encountering a function with no body (e.g.`@_silgen_name`)
+
+## [0.58.7](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.7) (2025-11-29)
+
+- Fixed `redundantSelf` not being applied inside `if #available(...) { ... }` clauses
+- Fixed `fileHeader` rule incorrectly setting creation year to current when file path contains spaces
+- Fixed mis-insertion for `nil-init` rule related to optional closure return values
+- Fixed `unusedPrivateDeclarations` false positive when call site was outside enabled range
+- Fixed `sortImports` rule incorrectly moving `// swift-tools-version:` comment directive
+- Fixed `hoistTry` rule sometimes producing mangled code when hoisting across line boundaries
+- Fixed crash in `--ruleinfo` command when rule options exceed the old max length requirement
+- Fixed crash in `unusedArguments` due to scope range bug
+
+## [0.58.6](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.6) (2025-11-11)
+
+- Fixed `docComments` not being applied correctly after conditional `switch...case`
+- Trailing commas are no longer inserted inside `#selector(...)` expressions
+- Source files listed with `--filelist` are now formatted concurrently
+- Trailing comments are now kept with the same line when wrapping
+- Fixed spurious `return` removal inside `repeat...while` loops
+- Fixed bug with `trailingClosures` rule and property wrappers
+- Fixed performance regression introduced in 0.58.5
+- Reduced timeout threshold to 1ms per token
+
+## [0.58.5](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.5) (2025-10-17)
+
+- Fixed regression with indenting of macros (introduced in 0.58.4)
+- Fixed spurious removal of `return` keyword inside `for ... where` loops
+- Fixed parsing error with `for await case ...` loops
+- Added `XCTUnwrap` to the default exclusion list for `hoistTry`
+
+## [0.58.4](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.4) (2025-10-16)
+
+- Whitespace is no longer added or removed from blank lines in multiline string literals
+- Fixed `trailingComma` rule incorrectly inserting commas inside typed `throws`
+- Fixed issue where `opaqueGenericParameters` rule could cause build errors with existential types
+- Fixed false positive with `unusedArguments` when argument is only referenced inside a macro
+- The `noGuardInTests` rule now preserves custom failure messages
+- The `noGuardInTests` rule no longer adds `throws` to test methods when not needed
+- Removed redundant "default" values from options help descriptions
+
+## [0.58.3](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.3) (2025-10-04)
+
+- Fixed parsing of `[n of X]` syntax for `InlineArray` in Swift 6.2
+- Fixed parsing error when an opening multiline string delimiter is followed by a space
+- Fixed issue where `redundantInit` rule could leave orphaned parentheses
+- Fixed bug where `redundantInit` was incorrectly applied to `(Foo.self as Bar.Type)` expressions
+- Fixed bug with parsing empty property accessors that broke `redundantSelf` rule
+- Fixed aliasing issue with `acronyms` rule where one acronym overlaps another
+- Fixed unexpected wrapping of closing parenthesis in `wrapArguments` rule
+- Added `--unknown-rules` option to support environments with older SwiftFormat versions
+
+## [0.58.2](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.2) (2025-09-29)
+
+- Fixed issue where `modifierOrder` rule confused `async` effect for `async` modifier
+- Fixed issue where testing related rules incorrectly treated functions with arguments as test cases
+- Updated `redundantInit` rule to apply to `init` calls with single trailing closure
+- Updated `README.md` to reflect actual precedence behavior between `.swift-version` files and `--swift-version` arguments.
+
+## [0.58.1](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.1) (2025-09-24)
+
+- Fixed issue where `async` effect could be confused for `async` modifier, breaking `docCommentsBeforeModifiers` rule in protocol body with async functions
+- Fixed issue where `wrapAttributes` rule would unexpectedly wrap `async` effect
+- Fixed issue where `.swift-version` file was ignored if not also using config file
+- Fixed issue where multiple trailing closure syntax could be applied to ineligible function calls
+- Fixed issue where `redundantAsync` ignored `await` keyword in string interpolation
+- Fixed bug where `acronyms` rule would incorrectly always capitalize potentially matching acronyms one letter before end of identifier
+- Updated `redundantLet` rule to handle `#Preview` macro
+
+## [0.58.0](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.58.0) (2025-09-22)
+
+- Added `noForceUnwrapInTests` rule
+- Added `redundantThrows` rule
+- Added `redundantAsync` rule
+- Added `preferFinalClasses` rule
+- Added support for Swift 6.2 raw identifiers
+- Updated `trailingCommas` rule to handle cases now supported by Swift 6.2
+- Updated `trailingClosures` rule to support multiple trailing closures
+- Added support for filtering config file options to a specific file path glob
+- Added `--allow-partial-wrapping false` option to disallow partial wrapping of functions and collections
+- Updated `propertyTypes` rule to support array, dictionary, and set literals
+- Added `organizeDeclarations` threshold options to organize types without adding marks
+- Added `--type-body-marks remove` option to `organizeDeclarations`
+- Updated `organizeDeclarations` to support organizing protocol bodies
+- Updated `organizeDeclarations` to treat `associatedtype` declarations as nested types, like `typealias` declarations.
+- Added `--blank-line-after-switch-case always` option to `blankLineAfterSwitchCase`
+- Add `--default-test-suite-attributes` option to `preferSwiftTesting` rule
+- Renamed `--markdown-files` options to `strict` and `lenient`
+- Updated `redundantPublic` rule to apply to private types
+- Updated `trailingClosures` and `trailingCommas` rules to support optional function calls
+- Fixed bug where `markTypes` rule wouldn't add marks after extensions
+- Fixed issue where `redundantPublic` broke `@_spi` annotated members
+- Improved parsing of nested markdown code blocks
+- Fixed issue where `hoistTry` rule could break `@Test` attribute
+- Fixed issue where `redundantVoidReturnType` rule could accidentally remove closure type
+- Fix `blankLinesAroundMark` not ignoring trailing comments at start of scope
+- Renamed `throwingTests` rule to `noForceTryInTests`
+- Updated `singlePropertyPerLine` to preserve `async let` declarations
+
+## [0.57.2](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.57.2) (2025-07-14)
+
+- Updated `trailingCommas` rule to handle function declarations with generic arguments.
+- Updated `--trailing-commas always` to preserve trailing commas rather than unnecessarily removing trailing commas in some edge cases.
+- Fixed spurious deprecation message when using some non-deprecated options.
+
+## [0.57.1](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.57.1) (2025-07-14)
+
+- Fixed issue where trailing commas were unexpectedly removed from initializer argument lists when using `--trailing-commas always`.
+- Fixed issue where `redundantPublic` rule didn't handle extensions on types defined in public extensions.
+- Added `@Bindable` to list of SwiftUI property wrappers used by `organizeDeclarations` rule.
+- Fixed case-sensitivity issue with `preferFileMacro` rule.
+
+## [0.57.0](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.57.0) (2025-07-13)
+
+- Options now use `--kebab-case`. Existing option names without dashes remain supported for backwards compatibility. Some options have been renamed to improve clarity.
+- Added support for `:this` and `:previous` in comment directives.
+- Added support for formatting code blocks in Markdown files.
+- Added support for multiple `--config` file arguments.
+- Added `singlePropertyPerLine` rule to convert property declarations defining multiple properties into separate declarations.
+- Added `redundantMemberwiseInit` rule to remove explicit memberwise initializers that are identical to the `struct`'s compiler-synthesized initializer.  
+- Added `redundantPublic` rule to remove public access control from properties of internal types.
+- Added `modifiersOnSameLine` rule to keep declaration modifiers on the same line.
+- Added `throwingTests` rule to prefer using `try` and `throws` in unit tests rather than `try!`.
+- Added `noGuardInTests` rule to prefer convert guard statements in unit tests to `try #require(...)` / `#expect(...)` or `try XCTUnwrap(...)` / `XCTAssert(...)`.
+- Added `urlMacro` rule to convert `URL(string: "...")!` initializers to a provided `#URL("...")` macro.
+- Added `--trailing-commas collections-only` and `--trailing-commas multi-element-lists` options to `trailingCommas` rule.
+- Added `--type-blank-lines insert` option to `blankLinesAtStartOfScope` and `blankLinesAtEndOfScope` rules.
+- Added `--wrap-string-interpolation` option to support disabling line wrapping within string interpolation.
+- Added `--line-between-guards` option to `blankLinesAfterGuardStatements` rule.
+- Added support for SARIF output format.
+- Improved performance of the `docComments` rule.
+- Fixed bug in `docComments` rule where trailing comments would be converted to doc comments.
+- Fixed bug where `redundantNilInit` rule would ignore type bodies with conformances.
+- Fixed bug where `wrapEnumCases` didn't handle some nested types correctly.
+- Fixed issue where `#` characters in config files couldn't be escaped.
+- Fixed issue where SwiftFormat for Xcode app would generate invalid config files with unescaped `#` characters.
+- Fixed issue where `--wrap-return-type never` didn't respect `--allman true`.
+
 ## [0.56.4](https://github.com/nicklockwood/SwiftFormat/releases/tag/0.56.4) (2025-06-15)
 
 - Fixed issue where `trailingCommas` rule would not insert trailing commas in function declarations with return type

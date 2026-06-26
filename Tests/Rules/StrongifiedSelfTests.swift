@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class StrongifiedSelfTests: XCTestCase {
+final class StrongifiedSelfTests: XCTestCase {
     func testBacktickedSelfConvertedToSelfInGuard() {
         let input = """
         { [weak self] in
@@ -64,7 +64,9 @@ class StrongifiedSelfTests: XCTestCase {
     }
 
     func testBacktickedSelfNotConvertedIfNotConditional() {
-        let input = "nonisolated(unsafe) let `self` = self"
+        let input = """
+        nonisolated(unsafe) let `self` = self
+        """
         let options = FormatOptions(swiftVersion: "4.2")
         testFormatting(for: input, rule: .strongifiedSelf, options: options)
     }

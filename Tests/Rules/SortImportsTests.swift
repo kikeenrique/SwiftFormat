@@ -9,129 +9,314 @@
 import XCTest
 @testable import SwiftFormat
 
-class SortImportsTests: XCTestCase {
+final class SortImportsTests: XCTestCase {
     func testSortImportsSimpleCase() {
-        let input = "import Foo\nimport Bar"
-        let output = "import Bar\nimport Foo"
+        let input = """
+        import Foo
+        import Bar
+        """
+        let output = """
+        import Bar
+        import Foo
+        """
+        testFormatting(for: input, output, rule: .sortImports)
+    }
+
+    func testDefaultGroupingBehaviorIsAccessControlThenAlpha() {
+        let input = """
+        @testable import Foo
+        import Zed
+        public import Alpha
+        import Bar
+        public import Beta
+        @testable import Ace
+        """
+        let output = """
+        public import Alpha
+        public import Beta
+        @testable import Ace
+        import Bar
+        @testable import Foo
+        import Zed
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testSortImportsKeepsPreviousCommentWithImport() {
-        let input = "import Foo\n// important comment\n// (very important)\nimport Bar"
-        let output = "// important comment\n// (very important)\nimport Bar\nimport Foo"
+        let input = """
+        import Foo
+        // important comment
+        // (very important)
+        import Bar
+        """
+        let output = """
+        // important comment
+        // (very important)
+        import Bar
+        import Foo
+        """
         testFormatting(for: input, output, rule: .sortImports,
                        exclude: [.blankLineAfterImports])
     }
 
     func testSortImportsKeepsPreviousCommentWithImport2() {
-        let input = "// important comment\n// (very important)\nimport Foo\nimport Bar"
-        let output = "import Bar\n// important comment\n// (very important)\nimport Foo"
+        let input = """
+        // important comment
+        // (very important)
+        import Foo
+        import Bar
+        """
+        let output = """
+        import Bar
+        // important comment
+        // (very important)
+        import Foo
+        """
         testFormatting(for: input, output, rule: .sortImports,
                        exclude: [.blankLineAfterImports])
     }
 
     func testSortImportsDoesntMoveHeaderComment() {
-        let input = "// header comment\n\nimport Foo\nimport Bar"
-        let output = "// header comment\n\nimport Bar\nimport Foo"
+        let input = """
+        // header comment
+
+        import Foo
+        import Bar
+        """
+        let output = """
+        // header comment
+
+        import Bar
+        import Foo
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testSortImportsDoesntMoveHeaderCommentFollowedByImportComment() {
-        let input = "// header comment\n\n// important comment\nimport Foo\nimport Bar"
-        let output = "// header comment\n\nimport Bar\n// important comment\nimport Foo"
+        let input = """
+        // header comment
+
+        // important comment
+        import Foo
+        import Bar
+        """
+        let output = """
+        // header comment
+
+        import Bar
+        // important comment
+        import Foo
+        """
         testFormatting(for: input, output, rule: .sortImports,
                        exclude: [.blankLineAfterImports])
     }
 
     func testSortImportsOnSameLine() {
-        let input = "import Foo; import Bar\nimport Baz"
-        let output = "import Baz\nimport Foo; import Bar"
+        let input = """
+        import Foo; import Bar
+        import Baz
+        """
+        let output = """
+        import Baz
+        import Foo; import Bar
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testSortImportsWithSemicolonAndCommentOnSameLine() {
-        let input = "import Foo; // foobar\nimport Bar\nimport Baz"
-        let output = "import Bar\nimport Baz\nimport Foo; // foobar"
+        let input = """
+        import Foo; // foobar
+        import Bar
+        import Baz
+        """
+        let output = """
+        import Bar
+        import Baz
+        import Foo; // foobar
+        """
         testFormatting(for: input, output, rule: .sortImports, exclude: [.semicolons])
     }
 
     func testSortImportEnum() {
-        let input = "import enum Foo.baz\nimport Foo.bar"
-        let output = "import Foo.bar\nimport enum Foo.baz"
+        let input = """
+        import enum Foo.baz
+        import Foo.bar
+        """
+        let output = """
+        import Foo.bar
+        import enum Foo.baz
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testSortImportFunc() {
-        let input = "import func Foo.baz\nimport Foo.bar"
-        let output = "import Foo.bar\nimport func Foo.baz"
+        let input = """
+        import func Foo.baz
+        import Foo.bar
+        """
+        let output = """
+        import Foo.bar
+        import func Foo.baz
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testAlreadySortImportsDoesNothing() {
-        let input = "import Bar\nimport Foo"
+        let input = """
+        import Bar
+        import Foo
+        """
         testFormatting(for: input, rule: .sortImports)
     }
 
     func testPreprocessorSortImports() {
-        let input = "#if os(iOS)\n    import Foo2\n    import Bar2\n#else\n    import Foo1\n    import Bar1\n#endif\nimport Foo3\nimport Bar3"
-        let output = "#if os(iOS)\n    import Bar2\n    import Foo2\n#else\n    import Bar1\n    import Foo1\n#endif\nimport Bar3\nimport Foo3"
+        let input = """
+        #if os(iOS)
+            import Foo2
+            import Bar2
+        #else
+            import Foo1
+            import Bar1
+        #endif
+        import Foo3
+        import Bar3
+        """
+        let output = """
+        #if os(iOS)
+            import Bar2
+            import Foo2
+        #else
+            import Bar1
+            import Foo1
+        #endif
+        import Bar3
+        import Foo3
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testTestableSortImports() {
-        let input = "@testable import Foo3\nimport Bar3"
-        let output = "import Bar3\n@testable import Foo3"
+        let input = """
+        @testable import Foo3
+        import Bar3
+        """
+        let output = """
+        import Bar3
+        @testable import Foo3
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testLengthSortImports() {
-        let input = "import Foo\nimport Module\nimport Bar3"
-        let output = "import Foo\nimport Bar3\nimport Module"
-        let options = FormatOptions(importGrouping: .length)
+        let input = """
+        import Foo
+        import Module
+        import Bar3
+        """
+        let output = """
+        import Foo
+        import Bar3
+        import Module
+        """
+        let options = FormatOptions(importGrouping: [.length])
         testFormatting(for: input, output, rule: .sortImports, options: options)
     }
 
     func testTestableImportsWithTestableOnPreviousLine() {
-        let input = "@testable\nimport Foo3\nimport Bar3"
-        let output = "import Bar3\n@testable\nimport Foo3"
+        let input = """
+        @testable
+        import Foo3
+        import Bar3
+        """
+        let output = """
+        import Bar3
+        @testable
+        import Foo3
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testTestableImportsWithGroupingTestableBottom() {
-        let input = "@testable import Bar\nimport Foo\n@testable import UIKit"
-        let output = "import Foo\n@testable import Bar\n@testable import UIKit"
-        let options = FormatOptions(importGrouping: .testableLast)
+        let input = """
+        @testable import Bar
+        import Foo
+        @testable import UIKit
+        """
+        let output = """
+        import Foo
+        @testable import Bar
+        @testable import UIKit
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .testableLast])
         testFormatting(for: input, output, rule: .sortImports, options: options)
     }
 
     func testTestableImportsWithGroupingTestableTop() {
-        let input = "@testable import Bar\nimport Foo\n@testable import UIKit"
-        let output = "@testable import Bar\n@testable import UIKit\nimport Foo"
-        let options = FormatOptions(importGrouping: .testableFirst)
+        let input = """
+        @testable import Bar
+        import Foo
+        @testable import UIKit
+        """
+        let output = """
+        @testable import Bar
+        @testable import UIKit
+        import Foo
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .testableFirst])
         testFormatting(for: input, output, rule: .sortImports, options: options)
     }
 
     func testCaseInsensitiveSortImports() {
-        let input = "import Zlib\nimport lib"
-        let output = "import lib\nimport Zlib"
+        let input = """
+        import Zlib
+        import lib
+        """
+        let output = """
+        import lib
+        import Zlib
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testCaseInsensitiveCaseDifferingSortImports() {
-        let input = "import c\nimport B\nimport A.a\nimport A.A"
-        let output = "import A.A\nimport A.a\nimport B\nimport c"
+        let input = """
+        import c
+        import B
+        import A.a
+        import A.A
+        """
+        let output = """
+        import A.A
+        import A.a
+        import B
+        import c
+        """
         testFormatting(for: input, output, rule: .sortImports)
     }
 
     func testNoDeleteCodeBetweenImports() {
-        let input = "import Foo\nfunc bar() {}\nimport Bar"
+        let input = """
+        import Foo
+        func bar() {}
+        import Bar
+        """
         testFormatting(for: input, rule: .sortImports,
                        exclude: [.blankLineAfterImports])
     }
 
     func testNoDeleteCodeBetweenImports2() {
-        let input = "import Foo\nimport Bar\nfoo = bar\nimport Bar"
-        let output = "import Bar\nimport Foo\nfoo = bar\nimport Bar"
+        let input = """
+        import Foo
+        import Bar
+        foo = bar
+        import Bar
+        """
+        let output = """
+        import Bar
+        import Foo
+        foo = bar
+        import Bar
+        """
         testFormatting(for: input, output, rule: .sortImports,
                        exclude: [.blankLineAfterImports])
     }
@@ -152,8 +337,20 @@ class SortImportsTests: XCTestCase {
     }
 
     func testSortContiguousImports() {
-        let input = "import Foo\nimport Bar\nfunc bar() {}\nimport Quux\nimport Baz"
-        let output = "import Bar\nimport Foo\nfunc bar() {}\nimport Baz\nimport Quux"
+        let input = """
+        import Foo
+        import Bar
+        func bar() {}
+        import Quux
+        import Baz
+        """
+        let output = """
+        import Bar
+        import Foo
+        func bar() {}
+        import Baz
+        import Quux
+        """
         testFormatting(for: input, output, rule: .sortImports,
                        exclude: [.blankLineAfterImports])
     }
@@ -210,5 +407,239 @@ class SortImportsTests: XCTestCase {
         import SomeOtherModule
         """
         testFormatting(for: input, output, rule: .sortImports)
+    }
+
+    func testNoMangleConditionalImportsFollowedByPrivateDeclaration() {
+        let input = """
+        #if canImport(UIKit)
+        import UIKit
+        private struct Foo {}
+        #elseif canImport(AppKit)
+        import AppKit
+        private struct Foo {}
+        #endif
+        """
+        let options = FormatOptions(swiftVersion: "6.1")
+        testFormatting(for: input, rule: .sortImports, options: options, exclude: [.blankLineAfterImports, .indent])
+    }
+
+    func testNoMoveSwiftToolsVersionLine() {
+        let input = """
+        // swift-tools-version: 6.2
+        import PackageDescription
+        import CompilerPluginSupport
+        """
+        let output = """
+        // swift-tools-version: 6.2
+        import CompilerPluginSupport
+        import PackageDescription
+        """
+        testFormatting(for: input, output, rule: .sortImports)
+    }
+
+    // MARK: - Access control sorting
+
+    func testAccessControlSortImports() {
+        let input = """
+        import Foo
+        private import Bar
+        public import Baz
+        """
+        let output = """
+        public import Baz
+        private import Bar
+        import Foo
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .accessControl])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testAccessControlSortAlphaWithinLevel() {
+        let input = """
+        public import Zebra
+        public import Alpha
+        public import Middle
+        """
+        let output = """
+        public import Alpha
+        public import Middle
+        public import Zebra
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .accessControl])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testAccessControlSortLengthWithinLevel() {
+        let input = """
+        public import Zebra
+        public import Al
+        public import Middle
+        """
+        let output = """
+        public import Al
+        public import Zebra
+        public import Middle
+        """
+        let options = FormatOptions(importGrouping: [.length, .accessControl])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testAccessControlSortLengthWithMultipleACLs() {
+        let input = """
+        private import LongPrivate
+        public import Baz
+        private import Al
+        public import LongPublic
+        import Foo
+        """
+        let output = """
+        public import Baz
+        public import LongPublic
+        private import Al
+        private import LongPrivate
+        import Foo
+        """
+        let options = FormatOptions(importGrouping: [.length, .accessControl])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testAccessControlWithTestableFirst() {
+        let input = """
+        import Foo
+        @testable import Bar
+        public import Baz
+        """
+        let output = """
+        @testable import Bar
+        public import Baz
+        import Foo
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .accessControl, .testableFirst])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testAccessControlWithTestableLast() {
+        let input = """
+        public import Baz
+        @testable import Bar
+        import Foo
+        """
+        let output = """
+        public import Baz
+        import Foo
+        @testable import Bar
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .accessControl, .testableLast])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testUnlabeledImportsSortLast() {
+        let input = """
+        import Foo
+        public import Bar
+        internal import Baz
+        import Qux
+        """
+        let output = """
+        public import Bar
+        internal import Baz
+        import Foo
+        import Qux
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .accessControl])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testTestableImportsSortedByACLAndAlpha() {
+        let input = """
+        @testable import DModule
+        @testable public import CModule
+        @testable import AModule
+        @testable public import BModule
+        import ZModule
+        public import UModule
+        import YModule
+        public import TModule
+        """
+        let output = """
+        public import TModule
+        public import UModule
+        import YModule
+        import ZModule
+        @testable public import BModule
+        @testable public import CModule
+        @testable import AModule
+        @testable import DModule
+        """
+        let options = FormatOptions(importGrouping: [.alpha, .accessControl, .testableLast])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    // MARK: - Length + testable combinations
+
+    func testLengthSortWithTestableTop() {
+        let input = """
+        import Foo
+        @testable import LongModule
+        import Ba
+        @testable import Az
+        """
+        let output = """
+        @testable import Az
+        @testable import LongModule
+        import Ba
+        import Foo
+        """
+        let options = FormatOptions(importGrouping: [.length, .testableFirst])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testLengthSortWithTestableBottom() {
+        let input = """
+        @testable import LongModule
+        import Foo
+        import Ba
+        @testable import Az
+        """
+        let output = """
+        import Ba
+        import Foo
+        @testable import Az
+        @testable import LongModule
+        """
+        let options = FormatOptions(importGrouping: [.length, .testableLast])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testLengthThenAlphaSortImports() {
+        let input = """
+        import Module
+        import Foo
+        import Bar
+        import Ab
+        """
+        let output = """
+        import Ab
+        import Bar
+        import Foo
+        import Module
+        """
+        let options = FormatOptions(importGrouping: [.length, .alpha])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
+    }
+
+    func testLengthThenAlphaSortImportsWithSameLength() {
+        let input = """
+        import Zed
+        import Foo
+        import Bar
+        """
+        let output = """
+        import Bar
+        import Foo
+        import Zed
+        """
+        let options = FormatOptions(importGrouping: [.length, .alpha])
+        testFormatting(for: input, output, rule: .sortImports, options: options)
     }
 }

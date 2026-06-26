@@ -9,95 +9,154 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantReturnTests: XCTestCase {
+final class RedundantReturnTests: XCTestCase {
     func testRemoveRedundantReturnInClosure() {
-        let input = "foo(with: { return 5 })"
-        let output = "foo(with: { 5 })"
+        let input = """
+        foo(with: { return 5 })
+        """
+        let output = """
+        foo(with: { 5 })
+        """
         testFormatting(for: input, output, rule: .redundantReturn, exclude: [.trailingClosures])
     }
 
     func testRemoveRedundantReturnInClosureWithArgs() {
-        let input = "foo(with: { foo in return foo })"
-        let output = "foo(with: { foo in foo })"
+        let input = """
+        foo(with: { foo in return foo })
+        """
+        let output = """
+        foo(with: { foo in foo })
+        """
         testFormatting(for: input, output, rule: .redundantReturn, exclude: [.trailingClosures])
     }
 
     func testRemoveRedundantReturnInMap() {
-        let input = "let foo = bar.map { return 1 }"
-        let output = "let foo = bar.map { 1 }"
+        let input = """
+        let foo = bar.map { return 1 }
+        """
+        let output = """
+        let foo = bar.map { 1 }
+        """
         testFormatting(for: input, output, rule: .redundantReturn)
     }
 
     func testNoRemoveReturnInComputedVar() {
-        let input = "var foo: Int { return 5 }"
-        testFormatting(for: input, rule: .redundantReturn)
+        let input = """
+        var foo: Int { return 5 }
+        """
+        testFormatting(for: input, rule: .redundantReturn, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testRemoveReturnInComputedVar() {
-        let input = "var foo: Int { return 5 }"
-        let output = "var foo: Int { 5 }"
+        let input = """
+        var foo: Int { return 5 }
+        """
+        let output = """
+        var foo: Int { 5 }
+        """
         let options = FormatOptions(swiftVersion: "5.1")
-        testFormatting(for: input, output, rule: .redundantReturn, options: options)
+        testFormatting(for: input, output, rule: .redundantReturn, options: options, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testNoRemoveReturnInGet() {
-        let input = "var foo: Int {\n    get { return 5 }\n    set { _foo = newValue }\n}"
+        let input = """
+        var foo: Int {
+            get { return 5 }
+            set { _foo = newValue }
+        }
+        """
         testFormatting(for: input, rule: .redundantReturn)
     }
 
     func testRemoveReturnInGet() {
-        let input = "var foo: Int {\n    get { return 5 }\n    set { _foo = newValue }\n}"
-        let output = "var foo: Int {\n    get { 5 }\n    set { _foo = newValue }\n}"
+        let input = """
+        var foo: Int {
+            get { return 5 }
+            set { _foo = newValue }
+        }
+        """
+        let output = """
+        var foo: Int {
+            get { 5 }
+            set { _foo = newValue }
+        }
+        """
         let options = FormatOptions(swiftVersion: "5.1")
         testFormatting(for: input, output, rule: .redundantReturn, options: options)
     }
 
     func testNoRemoveReturnInGetClosure() {
-        let input = "let foo = get { return 5 }"
-        let output = "let foo = get { 5 }"
+        let input = """
+        let foo = get { return 5 }
+        """
+        let output = """
+        let foo = get { 5 }
+        """
         testFormatting(for: input, output, rule: .redundantReturn)
     }
 
     func testRemoveReturnInVarClosure() {
-        let input = "var foo = { return 5 }()"
-        let output = "var foo = { 5 }()"
+        let input = """
+        var foo = { return 5 }()
+        """
+        let output = """
+        var foo = { 5 }()
+        """
         testFormatting(for: input, output, rule: .redundantReturn, exclude: [.redundantClosure])
     }
 
     func testRemoveReturnInParenthesizedClosure() {
-        let input = "var foo = ({ return 5 }())"
-        let output = "var foo = ({ 5 }())"
+        let input = """
+        var foo = ({ return 5 }())
+        """
+        let output = """
+        var foo = ({ 5 }())
+        """
         testFormatting(for: input, output, rule: .redundantReturn, exclude: [.redundantParens, .redundantClosure])
     }
 
     func testNoRemoveReturnInFunction() {
-        let input = "func foo() -> Int { return 5 }"
-        testFormatting(for: input, rule: .redundantReturn)
+        let input = """
+        func foo() -> Int { return 5 }
+        """
+        testFormatting(for: input, rule: .redundantReturn, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testRemoveReturnInFunction() {
-        let input = "func foo() -> Int { return 5 }"
-        let output = "func foo() -> Int { 5 }"
+        let input = """
+        func foo() -> Int { return 5 }
+        """
+        let output = """
+        func foo() -> Int { 5 }
+        """
         let options = FormatOptions(swiftVersion: "5.1")
-        testFormatting(for: input, output, rule: .redundantReturn, options: options)
+        testFormatting(for: input, output, rule: .redundantReturn, options: options, exclude: [.wrapFunctionBodies])
     }
 
     func testNoRemoveReturnInOperatorFunction() {
-        let input = "func + (lhs: Int, rhs: Int) -> Int { return 5 }"
-        testFormatting(for: input, rule: .redundantReturn, exclude: [.unusedArguments])
+        let input = """
+        func + (lhs: Int, rhs: Int) -> Int { return 5 }
+        """
+        testFormatting(for: input, rule: .redundantReturn, exclude: [.unusedArguments, .wrapFunctionBodies])
     }
 
     func testRemoveReturnInOperatorFunction() {
-        let input = "func + (lhs: Int, rhs: Int) -> Int { return 5 }"
-        let output = "func + (lhs: Int, rhs: Int) -> Int { 5 }"
+        let input = """
+        func + (lhs: Int, rhs: Int) -> Int { return 5 }
+        """
+        let output = """
+        func + (lhs: Int, rhs: Int) -> Int { 5 }
+        """
         let options = FormatOptions(swiftVersion: "5.1")
         testFormatting(for: input, output, rule: .redundantReturn, options: options,
-                       exclude: [.unusedArguments])
+                       exclude: [.unusedArguments, .wrapFunctionBodies])
     }
 
     func testNoRemoveReturnInFailableInit() {
-        let input = "init?() { return nil }"
-        testFormatting(for: input, rule: .redundantReturn)
+        let input = """
+        init?() { return nil }
+        """
+        testFormatting(for: input, rule: .redundantReturn, exclude: [.wrapFunctionBodies])
     }
 
     func testNoRemoveReturnInFailableInitWithConditional() {
@@ -134,23 +193,34 @@ class RedundantReturnTests: XCTestCase {
     }
 
     func testRemoveReturnInFailableInit() {
-        let input = "init?() { return nil }"
-        let output = "init?() { nil }"
+        let input = """
+        init?() { return nil }
+        """
+        let output = """
+        init?() { nil }
+        """
         let options = FormatOptions(swiftVersion: "5.1")
-        testFormatting(for: input, output, rule: .redundantReturn, options: options)
+        testFormatting(for: input, output, rule: .redundantReturn, options: options,
+                       exclude: [.wrapFunctionBodies])
     }
 
     func testNoRemoveReturnInSubscript() {
-        let input = "subscript(index: Int) -> String { return nil }"
-        testFormatting(for: input, rule: .redundantReturn, exclude: [.unusedArguments])
+        let input = """
+        subscript(index: Int) -> String { return nil }
+        """
+        testFormatting(for: input, rule: .redundantReturn, exclude: [.unusedArguments, .wrapFunctionBodies])
     }
 
     func testRemoveReturnInSubscript() {
-        let input = "subscript(index: Int) -> String { return nil }"
-        let output = "subscript(index: Int) -> String { nil }"
+        let input = """
+        subscript(index: Int) -> String { return nil }
+        """
+        let output = """
+        subscript(index: Int) -> String { nil }
+        """
         let options = FormatOptions(swiftVersion: "5.1")
         testFormatting(for: input, output, rule: .redundantReturn, options: options,
-                       exclude: [.unusedArguments])
+                       exclude: [.unusedArguments, .wrapFunctionBodies])
     }
 
     func testNoRemoveReturnInDoCatch() {
@@ -210,56 +280,78 @@ class RedundantReturnTests: XCTestCase {
     }
 
     func testNoRemoveReturnInForIn() {
-        let input = "for foo in bar { return 5 }"
+        let input = """
+        for _ in bar { return 5 }
+        """
         testFormatting(for: input, rule: .redundantReturn, exclude: [.wrapLoopBodies])
     }
 
     func testNoRemoveReturnInForWhere() {
-        let input = "for foo in bar where baz { return 5 }"
+        let input = """
+        for _ in bar where baz { return 5 }
+        """
         testFormatting(for: input, rule: .redundantReturn, exclude: [.wrapLoopBodies])
     }
 
     func testNoRemoveReturnInIfLetTry() {
-        let input = "if let foo = try? bar() { return 5 }"
+        let input = """
+        if let foo = try? bar() { return 5 }
+        """
         testFormatting(for: input, rule: .redundantReturn,
                        exclude: [.wrapConditionalBodies])
     }
 
     func testNoRemoveReturnInMultiIfLetTry() {
-        let input = "if let foo = bar, let bar = baz { return 5 }"
+        let input = """
+        if let foo = bar, let bar = baz { return 5 }
+        """
         testFormatting(for: input, rule: .redundantReturn,
                        exclude: [.wrapConditionalBodies])
     }
 
     func testNoRemoveReturnAfterMultipleAs() {
-        let input = "if foo as? bar as? baz { return 5 }"
+        let input = """
+        if foo as? bar as? baz { return 5 }
+        """
         testFormatting(for: input, rule: .redundantReturn,
                        exclude: [.wrapConditionalBodies])
     }
 
     func testRemoveVoidReturn() {
-        let input = "{ _ in return }"
-        let output = "{ _ in }"
+        let input = """
+        { _ in return }
+        """
+        let output = """
+        { _ in }
+        """
         testFormatting(for: input, output, rule: .redundantReturn)
     }
 
     func testNoRemoveReturnAfterKeyPath() {
-        let input = "func foo() { if bar == #keyPath(baz) { return 5 } }"
+        let input = """
+        func foo() { if bar == #keyPath(baz) { return 5 } }
+        """
         testFormatting(for: input, rule: .redundantReturn,
-                       exclude: [.wrapConditionalBodies])
+                       exclude: [.wrapConditionalBodies, .wrapFunctionBodies])
     }
 
     func testNoRemoveReturnAfterParentheses() {
-        let input = "if let foo = (bar as? String) { return foo }"
+        let input = """
+        if let foo = (bar as? String) { return foo }
+        """
         testFormatting(for: input, rule: .redundantReturn,
                        exclude: [.redundantParens, .wrapConditionalBodies])
     }
 
     func testRemoveReturnInTupleVarGetter() {
-        let input = "var foo: (Int, Int) { return (1, 2) }"
-        let output = "var foo: (Int, Int) { (1, 2) }"
+        let input = """
+        var foo: (Int, Int) { return (1, 2) }
+        """
+        let output = """
+        var foo: (Int, Int) { (1, 2) }
+        """
         let options = FormatOptions(swiftVersion: "5.1")
-        testFormatting(for: input, output, rule: .redundantReturn, options: options)
+        testFormatting(for: input, output, rule: .redundantReturn, options: options, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testNoRemoveReturnInIfLetWithNoSpaceAfterParen() {
@@ -315,7 +407,7 @@ class RedundantReturnTests: XCTestCase {
         """
         let options = FormatOptions(swiftVersion: "5.1")
         testFormatting(for: input, output, rule: .redundantReturn,
-                       options: options)
+                       options: options, exclude: [.simplifyGenericConstraints])
     }
 
     func testRemoveRedundantReturnInSubscriptWithWhereClause() {
@@ -331,7 +423,7 @@ class RedundantReturnTests: XCTestCase {
         """
         let options = FormatOptions(swiftVersion: "5.1")
         testFormatting(for: input, output, rule: .redundantReturn,
-                       options: options)
+                       options: options, exclude: [.simplifyGenericConstraints])
     }
 
     func testNoRemoveReturnFollowedByMoreCode() {
@@ -342,7 +434,7 @@ class RedundantReturnTests: XCTestCase {
             return bar
         }()
         """
-        testFormatting(for: input, rule: .redundantReturn, exclude: [.redundantProperty])
+        testFormatting(for: input, rule: .redundantReturn, exclude: [.redundantVariable])
     }
 
     func testNoRemoveReturnInForWhereLoop() {
@@ -465,7 +557,7 @@ class RedundantReturnTests: XCTestCase {
         }
         """
         testFormatting(for: input, rule: .redundantReturn,
-                       options: FormatOptions(swiftVersion: "5.1"), exclude: [.redundantProperty])
+                       options: FormatOptions(swiftVersion: "5.1"), exclude: [.redundantVariable])
     }
 
     func testNoRemoveRequiredReturnInIfClosure() {
@@ -1310,7 +1402,7 @@ class RedundantReturnTests: XCTestCase {
         let options = FormatOptions(swiftVersion: "5.9")
         testFormatting(for: input,
                        rules: [.redundantReturn, .conditionalAssignment],
-                       options: options)
+                       options: options, exclude: [.redundantSelf])
     }
 
     func testReturnNotRemovedFromCatchWhere() {
@@ -1331,5 +1423,69 @@ class RedundantReturnTests: XCTestCase {
         testFormatting(for: input,
                        rules: [.redundantReturn, .conditionalAssignment],
                        options: options)
+    }
+
+    func testForLoopReturnAfterSwitch() {
+        let input = """
+        func foo() -> Bool {
+            switch bar {
+            case .baz:
+                break
+            }
+
+            for i in quux where quux[i].foo {
+                return i > 0
+            }
+
+            return false
+        }
+        """
+        testFormatting(for: input, rule: .redundantReturn)
+    }
+
+    func testIssue1974() {
+        let input = """
+        func selectedRow() -> Int? {
+            var selectedItem: NSManagedObjectID?
+
+            guard let selection = selectedFilterSourceBlock?() as? UserDataSourceSelection else {
+                return nil
+            }
+
+            switch selection {
+            case .user(let managedObjectID):
+                selectedItem = managedObjectID
+            case .noValue:
+                return nil
+            }
+
+            if includeEveryone && selectedItem == nil {
+                return 0
+            }
+
+            for (i, item) in _items.enumerated() where item.objectID == selectedItem {
+                return i >= _limit ? _limit : i + (includeEveryone ? 1 : 0)
+            }
+
+            return nil
+        }
+        """
+        testFormatting(for: input, rule: .redundantReturn, exclude: [.hoistPatternLet, .andOperator])
+    }
+
+    func testIssue2263() {
+        let input = """
+        func firstNonNilValue<O>() async -> O where V == O? {
+            var it = values.makeAsyncIterator()
+            repeat {
+                if let value = await it.next(), let value {
+                    return value
+                }
+            }
+            while true
+        }
+        """
+        let options = FormatOptions(swiftVersion: "5.9")
+        testFormatting(for: input, rule: .redundantReturn, options: options, exclude: [.elseOnSameLine])
     }
 }

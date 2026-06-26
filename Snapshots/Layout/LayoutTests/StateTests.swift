@@ -3,7 +3,7 @@
 import XCTest
 @testable import Layout
 
-class StateTests: XCTestCase {
+final class StateTests: XCTestCase {
     struct TestState {
         var foo = 5
         var bar = "baz"
@@ -20,7 +20,7 @@ class StateTests: XCTestCase {
 
     func testNestedStateDictionary() {
         let node = LayoutNode(state: ["foo": ["bar": "baz"]])
-        XCTAssertEqual(try node.value(forSymbol: "foo") as! [String: String], ["bar": "baz"])
+        XCTAssertEqual(try node.value(forSymbol: "foo") as? [String: String], ["bar": "baz"])
         XCTAssertEqual(try node.value(forSymbol: "foo.bar") as? String, "baz")
     }
 
@@ -42,13 +42,13 @@ class StateTests: XCTestCase {
         XCTAssertEqual(try node.value(forSymbol: "bar") as? String, "baz")
     }
 
-    func testOptionalStruct() {
+    func testOptionalStruct() throws {
         var state: TestState? = TestState()
         let node = LayoutNode(state: state as Any)
         XCTAssertEqual(try node.value(forSymbol: "foo") as? Int, 5)
         XCTAssertEqual(try node.value(forSymbol: "bar") as? String, "baz")
         state?.foo = 10
-        node.setState(state!) // Force unwrap
+        try node.setState(XCTUnwrap(state)) // Force unwrap
         XCTAssertEqual(try node.value(forSymbol: "foo") as? Int, 10)
     }
 
@@ -72,10 +72,6 @@ class StateTests: XCTestCase {
 
     struct ChildState: Equatable {
         var baz = false
-
-        static func == (lhs: ChildState, rhs: ChildState) -> Bool {
-            return lhs.baz == rhs.baz
-        }
     }
 
     struct NestedState {
@@ -91,7 +87,7 @@ class StateTests: XCTestCase {
         XCTAssertEqual(try node.value(forSymbol: "bar.baz") as? Bool, false)
     }
 
-    class TestVC: UIViewController {
+    final class TestVC: UIViewController {
         var updated = false
 
         override func didUpdateLayout(for _: LayoutNode) {
@@ -99,10 +95,10 @@ class StateTests: XCTestCase {
         }
     }
 
-    func testStateDictionaryUpdates() {
+    func testStateDictionaryUpdates() throws {
         let node = LayoutNode(state: ["foo": 5, "bar": "baz"], expressions: ["top": "foo"])
         let vc = TestVC()
-        try! node.mount(in: vc)
+        try node.mount(in: vc)
         XCTAssertTrue(vc.updated)
         vc.updated = false
         node.setState(["foo": 6, "bar": "baz"]) // Changed
@@ -112,11 +108,11 @@ class StateTests: XCTestCase {
         XCTAssertFalse(vc.updated)
     }
 
-    func testStateStructUpdates() {
+    func testStateStructUpdates() throws {
         var state = TestState()
         let node = LayoutNode(state: state, expressions: ["top": "foo"])
         let vc = TestVC()
-        try! node.mount(in: vc)
+        try node.mount(in: vc)
         XCTAssertTrue(vc.updated)
         vc.updated = false
         state.foo = 6
@@ -127,15 +123,15 @@ class StateTests: XCTestCase {
         XCTAssertFalse(vc.updated)
     }
 
-    class OptionalChildModel {
+    final class OptionalChildModel {
         var name: String?
     }
 
-    class OptionalParentModel {
+    final class OptionalParentModel {
         var nestedModel: OptionalChildModel?
     }
 
-    func testStateClass() {
+    func testStateClass() throws {
         let state = OptionalParentModel()
         state.nestedModel = OptionalChildModel()
         let label = UILabel()
@@ -145,7 +141,7 @@ class StateTests: XCTestCase {
             expressions: ["text": "{nestedModel.name}"]
         )
         let vc = TestVC()
-        try! node.mount(in: vc)
+        try node.mount(in: vc)
         XCTAssertEqual(label.text, "")
         state.nestedModel?.name = "Foo"
         node.setState(state)

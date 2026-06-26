@@ -11,8 +11,8 @@ import Foundation
 public extension FormatRule {
     /// Sort import statements
     static let sortImports = FormatRule(
-        help: "Sort import statements alphabetically.",
-        options: ["importgrouping"],
+        help: "Sort and group import statements.",
+        options: ["import-grouping"],
         sharedOptions: ["linebreaks"]
     ) { formatter in
         for var importRanges in formatter.parseImports().reversed() {
@@ -62,19 +62,46 @@ public extension FormatRule {
 
 extension Formatter {
     func sortRanges(_ ranges: [Formatter.ImportRange]) -> [Formatter.ImportRange] {
-        if case .alpha = options.importGrouping {
-            return ranges.sorted(by: <)
-        } else if case .length = options.importGrouping {
-            return ranges.sorted { $0.module.count < $1.module.count }
+        let grouping = options.importGrouping
+
+        let partitions: [[Formatter.ImportRange]]
+        if grouping.contains(.testableFirst) {
+            partitions = [ranges.filter(\.isTestable), ranges.filter { !$0.isTestable }]
+        } else if grouping.contains(.testableLast) {
+            partitions = [ranges.filter { !$0.isTestable }, ranges.filter(\.isTestable)]
+        } else {
+            partitions = [ranges]
         }
-        // Group @testable imports at the top or bottom
-        // TODO: need more general solution for handling other import attributes
-        return ranges.sorted {
-            // If both have a @testable keyword, or neither has one, just sort alphabetically
-            guard $0.isTestable != $1.isTestable else {
-                return $0 < $1
+
+        return partitions.flatMap { partition in
+            partition.sorted { lhs, rhs in
+                if grouping.contains(.accessControl) {
+                    let lhsAccessOrder = accessLevelSortOrder(for: lhs)
+                    let rhsAccessOrder = accessLevelSortOrder(for: rhs)
+                    if lhsAccessOrder != rhsAccessOrder {
+                        return lhsAccessOrder > rhsAccessOrder
+                    }
+                }
+
+                if grouping.contains(.length) {
+                    if lhs.module.count != rhs.module.count {
+                        return lhs.module.count < rhs.module.count
+                    }
+                    if grouping.contains(.alpha) {
+                        return lhs < rhs
+                    }
+                    return false
+                }
+                // Default to alphabetical
+                return lhs < rhs
             }
-            return options.importGrouping == .testableFirst ? $0.isTestable : $1.isTestable
         }
+    }
+
+    /// Sort order for import access level using aclModifiers (higher index = more visible).
+    /// Unlabeled imports return -1 (sorted last).
+    func accessLevelSortOrder(for range: Formatter.ImportRange) -> Int {
+        guard let level = range.accessLevel else { return -1 }
+        return _FormatRules.aclModifiers.firstIndex(of: level) ?? -1
     }
 }

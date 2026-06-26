@@ -18,7 +18,7 @@ public extension FormatRule {
         next line).
         """,
         orderAfter: [.wrapMultilineStatementBraces],
-        options: ["elseposition", "guardelse"],
+        options: ["else-position", "guard-else"],
         sharedOptions: ["allman", "linebreaks"]
     ) { formatter in
         formatter.forEachToken { i, token in
@@ -87,7 +87,7 @@ public extension FormatRule {
                     return
                 }
 
-                let shouldWrap = formatter.options.allmanBraces || formatter.options.elseOnNextLine
+                let shouldWrap = formatter.options.allmanBraces || formatter.options.elsePosition == .nextLine
                 if !shouldWrap, formatter.tokens[prevIndex].isLinebreak {
                     if let prevBraceIndex = formatter.index(of: .nonSpaceOrLinebreak, before: prevIndex, if: {
                         $0 == .endOfScope("}")

@@ -12,16 +12,10 @@ public extension FormatRule {
     /// Standardise the order of property modifiers
     static let modifierOrder = FormatRule(
         help: "Use consistent ordering for member modifiers.",
-        options: ["modifierorder"]
+        options: ["modifier-order"]
     ) { formatter in
         formatter.forEach(.keyword) { i, token in
-            switch token.string {
-            case "let", "func", "var", "class", "actor", "extension", "init", "enum",
-                 "struct", "typealias", "subscript", "associatedtype", "protocol":
-                break
-            default:
-                return
-            }
+            guard token.isDeclarationTypeKeyword else { return }
             var modifiers = [String: [Token]]()
             var lastModifier: (name: String, tokens: [Token])?
             func pushModifier() {
@@ -36,7 +30,7 @@ public extension FormatRule {
                     lastModifier = nil
                     lastIndex = previousIndex
                     break loop
-                case let token where token.isModifierKeyword:
+                case let token where formatter.isModifier(at: index):
                     pushModifier()
                     lastModifier = (token.string, [Token](formatter.tokens[index ..< lastIndex]))
                     previousIndex = lastIndex
@@ -45,7 +39,7 @@ public extension FormatRule {
                     if case let .identifier(param)? = formatter.last(.nonSpaceOrCommentOrLinebreak, before: index),
                        let openParenIndex = formatter.index(of: .startOfScope("("), before: index),
                        let index = formatter.index(of: .nonSpaceOrCommentOrLinebreak, before: openParenIndex),
-                       let token = formatter.token(at: index), token.isModifierKeyword
+                       let token = formatter.token(at: index), formatter.isModifier(at: index)
                     {
                         pushModifier()
                         let modifier = token.string + (param == "set" ? "(set)" : "")
@@ -87,7 +81,7 @@ public extension FormatRule {
         + private convenience init()
         ```
 
-        **NOTE:** If the `--modifierorder` option isn't set, the default order will be:
+        **NOTE:** If the `--modifier-order` option isn't set, the default order will be:
         `\(_FormatRules.defaultModifierOrder.flatMap { $0 }.joined(separator: "`, `"))`
         """
     }

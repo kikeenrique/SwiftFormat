@@ -9,20 +9,28 @@
 import XCTest
 @testable import SwiftFormat
 
-class SpaceAroundGenericsTests: XCTestCase {
+final class SpaceAroundGenericsTests: XCTestCase {
     func testSpaceAroundGenerics() {
-        let input = "Foo <Bar <Baz>>"
-        let output = "Foo<Bar<Baz>>"
+        let input = """
+        Foo <Bar <Baz>>
+        """
+        let output = """
+        Foo<Bar<Baz>>
+        """
         testFormatting(for: input, output, rule: .spaceAroundGenerics)
     }
 
     func testSpaceAroundGenericsFollowedByAndOperator() {
-        let input = "if foo is Foo<Bar> && baz {}"
+        let input = """
+        if foo is Foo<Bar> && baz {}
+        """
         testFormatting(for: input, rule: .spaceAroundGenerics, exclude: [.andOperator])
     }
 
     func testSpaceAroundGenericResultBuilder() {
-        let input = "func foo(@SomeResultBuilder<Self> builder _: () -> Void) {}"
+        let input = """
+        func foo(@SomeResultBuilder<Self> builder _: () -> Void) {}
+        """
         testFormatting(for: input, rule: .spaceAroundGenerics)
     }
 }

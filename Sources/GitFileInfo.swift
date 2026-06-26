@@ -52,8 +52,8 @@ extension GitFileInfo {
     }
 
     var author: String? {
-        if let authorName = authorName {
-            if let authorEmail = authorEmail {
+        if let authorName {
+            if let authorEmail {
                 return "\(authorName) <\(authorEmail)>"
             }
             return authorName
@@ -107,29 +107,20 @@ private let getGitRoot: (URL) -> URL? = memoize({ $0.relativePath }) { url in
     return URL(fileURLWithPath: root, isDirectory: true)
 }
 
-// If a file has never been committed, default to the local git user for the repository
+/// If a file has never been committed, default to the local git user for the repository
 private let getDefaultGitInfo: (URL) -> GitFileInfo = memoize({ $0.relativePath }) { url in
     let name = "git config user.name".shellOutput(cwd: url)
     let email = "git config user.email".shellOutput(cwd: url)
-
     return GitFileInfo(authorName: name, authorEmail: email)
 }
 
 private let getMovedFiles: (URL) -> [(from: URL, to: URL)] = memoize({ $0.relativePath }) { root in
     let command = "git diff --diff-filter=R --staged --name-status"
-    let output = command.shellOutput(cwd: root)
-
-    guard let safeValue = output, !safeValue.isEmpty else { return [] }
-
-    return safeValue.split(separator: "\n").compactMap { input -> (URL, URL)? in
-        var parts = input.split(separator: "\t").dropFirst()
-
+    guard let output = command.shellOutput(cwd: root) else { return [] }
+    return output.components(separatedBy: "\n").compactMap { input -> (URL, URL)? in
+        var parts = input.components(separatedBy: "\t").dropFirst()
         guard let from = parts.popFirst(), let to = parts.popFirst(), from != to else { return nil }
-
-        let fromURL = URL(fileURLWithPath: String(from), relativeTo: root)
-        let toURL = URL(fileURLWithPath: String(to), relativeTo: root)
-
-        return (fromURL, toURL)
+        return (URL(fileURLWithPath: from, relativeTo: root), URL(fileURLWithPath: to, relativeTo: root))
     }
 }
 
@@ -144,24 +135,12 @@ private func getCommitHash(_ url: URL, root: URL) -> String? {
         "--author-date-order",
         "--pretty=%H",
         "--",
-        trackedFile.relativePath,
+        "\"\(trackedFile.relativePath)\"",
     ]
-    .filter { ($0?.count ?? 0) > 0 }
     .joined(separator: " ")
 
-    let output = command.shellOutput(cwd: root)
-
-    guard let safeValue = output, !safeValue.isEmpty else { return nil }
-
-    if safeValue.contains("\n") {
-        let parts = safeValue.split(separator: "\n")
-
-        if parts.count > 1, let first = parts.first {
-            return String(first)
-        }
-    }
-
-    return safeValue
+    guard let output = command.shellOutput(cwd: root) else { return nil }
+    return output.components(separatedBy: "\n").first.flatMap { $0.isEmpty ? nil : $0 }
 }
 
 private let getCommitInfo: ((String?, URL)) -> GitFileInfo? = memoize(
@@ -169,7 +148,7 @@ private let getCommitInfo: ((String?, URL)) -> GitFileInfo? = memoize(
     { hash, root in
         let defaultInfo = getDefaultGitInfo(root)
 
-        guard let hash = hash else {
+        guard let hash else {
             return GitFileInfo(authorName: defaultInfo.authorName,
                                authorEmail: defaultInfo.authorEmail)
         }

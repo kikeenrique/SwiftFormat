@@ -3,7 +3,7 @@
 import XCTest
 @testable import Layout
 
-class RuntimeTypeTests: XCTestCase {
+final class RuntimeTypeTests: XCTestCase {
     // MARK: Sanitized type names
 
     func testSanitizeURLName() {
@@ -230,15 +230,15 @@ class RuntimeTypeTests: XCTestCase {
         XCTAssertNotNil(runtimeType.cast([5.0]))
         XCTAssertNotNil(runtimeType.cast(NSArray()))
         XCTAssertNotNil(runtimeType.cast([String]()))
-        XCTAssertEqual(runtimeType.cast(5) as! [Int], [5]) // Stringified and array-ified
+        XCTAssertEqual(runtimeType.cast(5) as? [Int], [5]) // Stringified and array-ified
     }
 
     func testCastStringArray() {
         let runtimeType = RuntimeType([String].self)
         XCTAssertNotNil(runtimeType.cast(["foo"]))
-        XCTAssertEqual(runtimeType.cast([5]) as! [String], ["5"]) // Anything can be stringified
-        XCTAssertEqual(runtimeType.cast("foo") as! [String], ["foo"]) // Is array-ified
-        XCTAssertEqual(runtimeType.cast(5) as! [String], ["5"]) // Stringified and array-ified
+        XCTAssertEqual(runtimeType.cast([5]) as? [String], ["5"]) // Anything can be stringified
+        XCTAssertEqual(runtimeType.cast("foo") as? [String], ["foo"]) // Is array-ified
+        XCTAssertEqual(runtimeType.cast(5) as? [String], ["5"]) // Stringified and array-ified
     }
 
     func testCastArrayArray() {

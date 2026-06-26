@@ -9,21 +9,31 @@
 import XCTest
 @testable import SwiftFormat
 
-class BlockCommentsTests: XCTestCase {
+final class BlockCommentsTests: XCTestCase {
     func testBlockCommentsOneLine() {
-        let input = "foo = bar /* comment */"
-        let output = "foo = bar // comment"
+        let input = """
+        foo = bar /* comment */
+        """
+        let output = """
+        foo = bar // comment
+        """
         testFormatting(for: input, output, rule: .blockComments)
     }
 
     func testDocBlockCommentsOneLine() {
-        let input = "foo = bar /** doc comment */"
-        let output = "foo = bar /// doc comment"
+        let input = """
+        foo = bar /** doc comment */
+        """
+        let output = """
+        foo = bar /// doc comment
+        """
         testFormatting(for: input, output, rule: .blockComments)
     }
 
     func testPreservesBlockCommentInSingleLineScope() {
-        let input = "if foo { /* code */ }"
+        let input = """
+        if foo { /* code */ }
+        """
         testFormatting(for: input, rule: .blockComments)
     }
 
@@ -74,12 +84,12 @@ class BlockCommentsTests: XCTestCase {
         let input = """
         /**
          * This is a documentation comment,
-         * not a standard comment.
+         * not a regular comment.
          */
         """
         let output = """
         /// This is a documentation comment,
-        /// not a standard comment.
+        /// not a regular comment.
         """
         testFormatting(for: input, output, rule: .blockComments, exclude: [.docComments])
     }
@@ -88,12 +98,12 @@ class BlockCommentsTests: XCTestCase {
         let input = """
         /**
          This is a documentation comment,
-         not a standard comment.
+         not a regular comment.
          */
         """
         let output = """
         /// This is a documentation comment,
-        /// not a standard comment.
+        /// not a regular comment.
         """
         testFormatting(for: input, output, rule: .blockComments, exclude: [.docComments])
     }

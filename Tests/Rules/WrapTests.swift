@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class WrapTests: XCTestCase {
+final class WrapTests: XCTestCase {
     func testWrapIfStatement() {
         let input = """
         if let foo = foo, let bar = bar, let baz = baz {}
@@ -123,7 +123,9 @@ class WrapTests: XCTestCase {
     }
 
     func testWrapClosure3() {
-        let input = "let foo = bar { $0.baz }"
+        let input = """
+        let foo = bar { $0.baz }
+        """
         let output = """
         let foo = bar {
             $0.baz }
@@ -381,22 +383,31 @@ class WrapTests: XCTestCase {
     }
 
     func testNoWrapAtUnspacedOperator() {
-        let input = "let foo = bar+baz+quux"
-        let output = "let foo =\n    bar+baz+quux"
+        let input = """
+        let foo = bar+baz+quux
+        """
+        let output = """
+        let foo =
+            bar+baz+quux
+        """
         let options = FormatOptions(maxWidth: 15)
         testFormatting(for: input, output, rule: .wrap, options: options,
                        exclude: [.spaceAroundOperators])
     }
 
     func testNoWrapAtUnspacedEquals() {
-        let input = "let foo=bar+baz+quux"
+        let input = """
+        let foo=bar+baz+quux
+        """
         let options = FormatOptions(maxWidth: 15)
         testFormatting(for: input, rule: .wrap, options: options,
                        exclude: [.spaceAroundOperators])
     }
 
     func testNoWrapSingleParameter() {
-        let input = "let fooBar = try unkeyedContainer.decode(FooBar.self)"
+        let input = """
+        let fooBar = try unkeyedContainer.decode(FooBar.self)
+        """
         let output = """
         let fooBar = try unkeyedContainer
             .decode(FooBar.self)
@@ -406,7 +417,9 @@ class WrapTests: XCTestCase {
     }
 
     func testWrapSingleParameter() {
-        let input = "let fooBar = try unkeyedContainer.decode(FooBar.self)"
+        let input = """
+        let fooBar = try unkeyedContainer.decode(FooBar.self)
+        """
         let output = """
         let fooBar = try unkeyedContainer.decode(
             FooBar.self
@@ -417,7 +430,9 @@ class WrapTests: XCTestCase {
     }
 
     func testWrapFunctionArrow() {
-        let input = "func foo() -> Int {}"
+        let input = """
+        func foo() -> Int {}
+        """
         let output = """
         func foo()
             -> Int {}
@@ -427,7 +442,9 @@ class WrapTests: XCTestCase {
     }
 
     func testNoWrapFunctionArrow() {
-        let input = "func foo() -> Int {}"
+        let input = """
+        func foo() -> Int {}
+        """
         let output = """
         func foo(
         ) -> Int {}
@@ -485,7 +502,7 @@ class WrapTests: XCTestCase {
                        exclude: [.indent, .wrapArguments])
     }
 
-    func testWrapColorLiteral() throws {
+    func testWrapColorLiteral() {
         let input = """
         button.setTitleColor(#colorLiteral(red: 0.2392156863, green: 0.6470588235, blue: 0.3647058824, alpha: 1), for: .normal)
         """
@@ -494,7 +511,9 @@ class WrapTests: XCTestCase {
     }
 
     func testWrapImageLiteral() {
-        let input = "if let image = #imageLiteral(resourceName: \"abc.png\") {}"
+        let input = """
+        if let image = #imageLiteral(resourceName: \"abc.png\") {}
+        """
         let options = FormatOptions(maxWidth: 40, assetLiteralWidth: .visualWidth)
         testFormatting(for: input, rule: .wrap, options: options)
     }
@@ -524,37 +543,67 @@ class WrapTests: XCTestCase {
         testFormatting(for: input, output, rule: .wrap, options: options)
     }
 
+    func testPreserveMultiLineStringInterpolationWrapAfterFirst() {
+        let input = """
+        \"""
+        a very long string literal with \\(interpolation) inside
+        \"""
+        """
+        let options = FormatOptions(wrapArguments: .afterFirst, wrapStringInterpolation: .preserve, maxWidth: 40)
+        testFormatting(for: input, rule: .wrap, options: options)
+    }
+
+    func testPreserveMultiLineStringInterpolationWrapBeforeFirst() {
+        let input = """
+        \"""
+        a very long string literal with \\(interpolation) inside
+        \"""
+        """
+        let options = FormatOptions(wrapArguments: .beforeFirst, wrapStringInterpolation: .preserve, maxWidth: 40)
+        testFormatting(for: input, rule: .wrap, options: options)
+    }
+
+    func testPreserveCustomMultiLineStringInterpolationWrapBeforeFirst() {
+        let input = #"""
+        """
+        \(raw: isPublic ? "public " : "")lazy var \(raw: name.trimmed.description): \(raw: typeName)<\(raw: genericName),\(returnType)> = {
+        """
+        """#
+        let options = FormatOptions(wrapArguments: .beforeFirst, wrapStringInterpolation: .preserve, maxWidth: 40)
+        testFormatting(for: input, rule: .wrap, options: options)
+    }
+
     // ternary expressions
 
     func testWrapSimpleTernaryOperator() {
         let input = """
-        let foo = fooCondition ? longValueThatContainsFoo : longValueThatContainsBar
+        let foo = fooCondition ? longValueThatContainsFoo(bar) : longValueThatContainsBar(baaz)
         """
 
         let output = """
         let foo = fooCondition
-            ? longValueThatContainsFoo
-            : longValueThatContainsBar
+            ? longValueThatContainsFoo(bar)
+            : longValueThatContainsBar(baaz)
         """
 
-        let options = FormatOptions(wrapTernaryOperators: .beforeOperators, maxWidth: 60)
-        testFormatting(for: input, output, rule: .wrap, options: options)
+        let options = FormatOptions(wrapTernaryOperators: .beforeOperators, maxWidth: 40)
+        testFormatting(for: input, [output], rules: [.wrap, .wrapArguments], options: options)
     }
 
     func testRewrapsSimpleTernaryOperator() {
         let input = """
-        let foo = fooCondition ? longValueThatContainsFoo :
-            longValueThatContainsBar
+        let foo = fooCondition ? longValueThatContainsFoo(bar) :
+            longValueThatContainsBar(baaz)
         """
 
         let output = """
         let foo = fooCondition
-            ? longValueThatContainsFoo
-            : longValueThatContainsBar
+            ? longValueThatContainsFoo(bar)
+            : longValueThatContainsBar(baaz)
         """
 
-        let options = FormatOptions(wrapTernaryOperators: .beforeOperators, maxWidth: 60)
-        testFormatting(for: input, output, rule: .wrap, options: options)
+        let options = FormatOptions(wrapTernaryOperators: .beforeOperators, maxWidth: 40)
+        testFormatting(for: input, [output], rules: [.wrap, .wrapArguments], options: options)
     }
 
     func testWrapComplexTernaryOperator() {
@@ -743,5 +792,108 @@ class WrapTests: XCTestCase {
         let options = FormatOptions(truncateBlankLines: false, maxWidth: 120)
         let changes = try lint(input, rules: [.wrap, .indent], options: options)
         XCTAssertEqual(changes, [.init(line: 13, rule: .indent, filePath: nil, isMove: false)])
+    }
+
+    func testKeepTrailingCommentWithLine() {
+        // https://github.com/nicklockwood/SwiftFormat/issues/2261
+        let input = """
+        [
+            item1, // Comment 1
+            item2, // Comment 2
+            item3 // Comment 3
+        ]
+        """
+
+        let options = FormatOptions(maxWidth: 20)
+        testFormatting(for: input, rule: .wrap, options: options,
+                       exclude: [.trailingCommas, .wrapSingleLineComments])
+    }
+
+    func testKeepTrailingCommentWithLine2() {
+        let input = """
+        [
+            item1, // Comment 1
+            item2, // Comment 2
+            item3 // Comment 3
+        ]
+        """
+
+        let output = """
+        [
+            item1, // Comment
+            // 1
+            item2, // Comment
+            // 2
+            item3 // Comment
+            // 3
+        ]
+        """
+
+        testFormatting(for: input, [output],
+                       rules: [.wrap, .wrapSingleLineComments],
+                       options: FormatOptions(maxWidth: 20),
+                       exclude: [.trailingCommas])
+    }
+
+    func testWrapDoubleColonBreaksBeforeOperator() {
+        let input = """
+        NationalAeronauticsAndSpaceAdministration::RocketEngine
+        """
+        let output = """
+        NationalAeronauticsAndSpaceAdministration
+            ::RocketEngine
+        """
+        let options = FormatOptions(maxWidth: 50)
+        testFormatting(for: input, output, rule: .wrap, options: options)
+    }
+
+    func testWrapDoubleColonWithSpacesBreaksBeforeOperator() {
+        let input = """
+        NationalAeronauticsAndSpaceAdministration :: RocketEngine
+        """
+        let output = """
+        NationalAeronauticsAndSpaceAdministration
+            :: RocketEngine
+        """
+        let output2 = """
+        NationalAeronauticsAndSpaceAdministration
+            ::RocketEngine
+        """
+        let options = FormatOptions(maxWidth: 50)
+        testFormatting(for: input, [output, output2], rules: [.wrap], options: options)
+    }
+
+    func testNoWrapEmptyFuncParens() {
+        let input = """
+        func aVeryLongFunctionNameThatExceedsTheMaxWidthLimit() {
+            print("hello")
+        }
+        """
+        let options = FormatOptions(maxWidth: 40)
+        testFormatting(for: input, rule: .wrap, options: options)
+    }
+
+    func testNoWrapEmptyFuncParensSingleLine() {
+        let input = """
+        func aVeryLongFunctionNameThatExceedsTheMaxWidthLimit() {}
+        """
+        let options = FormatOptions(maxWidth: 40)
+        testFormatting(for: input, rule: .wrap, options: options)
+    }
+
+    func testUnwrapAlreadyWrappedEmptyFuncParens() {
+        let input = """
+        func aVeryLongFunctionNameThatExceedsTheMaxWidthLimit(
+        ) {
+            print("hello")
+        }
+        """
+        let output = """
+        func aVeryLongFunctionNameThatExceedsTheMaxWidthLimit() {
+            print("hello")
+        }
+        """
+        let options = FormatOptions(maxWidth: 40)
+        testFormatting(for: input, output, rule: .wrap, options: options)
     }
 }

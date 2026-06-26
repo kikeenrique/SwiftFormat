@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantInternalTests: XCTestCase {
+final class RedundantInternalTests: XCTestCase {
     func testRemoveRedundantInternalACL() {
         let input = """
         internal class Foo {
@@ -87,7 +87,9 @@ class RedundantInternalTests: XCTestCase {
     }
 
     func testPreserveInternalImport() {
-        let input = "internal import MyPackage"
+        let input = """
+        internal import MyPackage
+        """
         testFormatting(for: input, rule: .redundantInternal)
     }
 

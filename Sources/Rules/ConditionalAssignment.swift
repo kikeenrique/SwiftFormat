@@ -12,7 +12,7 @@ public extension FormatRule {
     static let conditionalAssignment = FormatRule(
         help: "Assign properties using if / switch expressions.",
         orderAfter: [.redundantReturn],
-        options: ["condassignment"]
+        options: ["conditional-assignment"]
     ) { formatter in
         // If / switch expressions were added in Swift 5.9 (SE-0380)
         guard formatter.options.swiftVersion >= "5.9" else {
@@ -57,7 +57,7 @@ public extension FormatRule {
                let property = formatter.parsePropertyDeclaration(atIntroducerIndex: introducerIndex),
                formatter.tokens[lvalueRange.lowerBound].string == property.identifier,
                property.value == nil,
-               let typeRange = property.type?.range,
+               let typeRange = property.typeRange,
                let nextTokenAfterProperty = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: typeRange.upperBound),
                nextTokenAfterProperty == startOfConditional
             {
@@ -107,7 +107,7 @@ public extension FormatRule {
                     startOfParentScope = formatter.startOfScope(at: caseToken)
                 }
 
-                if let startOfParentScope = startOfParentScope,
+                if let startOfParentScope,
                    let mostRecentIfOrSwitch = formatter.index(of: .keyword, before: startOfParentScope, if: { ["if", "switch"].contains($0.string) }),
                    let conditionalBranches = formatter.conditionalBranches(at: mostRecentIfOrSwitch),
                    let startOfFirstParentBranch = conditionalBranches.first?.startOfBranch,
@@ -156,7 +156,7 @@ public extension FormatRule {
         +     "bar"
           }
 
-        // With --condassignment always (disabled by default)
+          // With --condassignment always (disabled by default)
         - switch condition {
         + foo.bar = switch condition {
           case true:
@@ -172,8 +172,8 @@ public extension FormatRule {
 }
 
 extension Formatter {
-    // Whether or not the conditional statement that starts at the given index
-    // has branches that are exhaustive
+    /// Whether or not the conditional statement that starts at the given index
+    /// has branches that are exhaustive
     func conditionalBranchesAreExhaustive(
         conditionKeywordIndex: Int,
         branches: [Formatter.ConditionalBranch]
@@ -195,11 +195,11 @@ extension Formatter {
         return false
     }
 
-    // Whether or not the given conditional branch body qualifies as a single statement
-    // that assigns a value to `identifier`. This is either:
-    //  1. a single assignment to `lvalue =`
-    //  2. a single `if` or `switch` statement where each of the branches also qualify,
-    //     and the statement is exhaustive.
+    /// Whether or not the given conditional branch body qualifies as a single statement
+    /// that assigns a value to `identifier`. This is either:
+    ///  1. a single assignment to `lvalue =`
+    ///  2. a single `if` or `switch` statement where each of the branches also qualify,
+    ///     and the statement is exhaustive.
     func isExhaustiveSingleStatementAssignment(_ branch: Formatter.ConditionalBranch, lvalueRange: ClosedRange<Int>) -> Bool {
         guard let firstTokenIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: branch.startOfBranch) else { return false }
 
@@ -269,7 +269,7 @@ extension Formatter {
         return false
     }
 
-    // Removes the `identifier =` from each conditional branch
+    /// Removes the `identifier =` from each conditional branch
     func removeAssignmentFromAllBranches(of conditionalBranches: [ConditionalBranch]) {
         forEachRecursiveConditionalBranch(in: conditionalBranches) { branch in
             guard let firstTokenIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: branch.startOfBranch),

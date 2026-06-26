@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class DocCommentsBeforeModifiersTests: XCTestCase {
+final class DocCommentsBeforeModifiersTests: XCTestCase {
     func testDocCommentsBeforeAttributes() {
         let input = """
         @MainActor
@@ -95,7 +95,7 @@ class DocCommentsBeforeModifiersTests: XCTestCase {
         func bar() {}
         """
 
-        testFormatting(for: input, output, rule: .docCommentsBeforeModifiers)
+        testFormatting(for: input, output, rule: .docCommentsBeforeModifiers, exclude: [.modifiersOnSameLine])
     }
 
     func testUpdatesCommentsAfterMark() {
@@ -158,7 +158,7 @@ class DocCommentsBeforeModifiersTests: XCTestCase {
         """
 
         testFormatting(for: input, output, rule: .docCommentsBeforeModifiers,
-                       exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope])
+                       exclude: [.blankLinesAtStartOfScope, .blankLinesAtEndOfScope, .redundantPublic, .docComments])
     }
 
     func testPreservesCommentOnSameLineAsAttribute() {
@@ -303,5 +303,25 @@ class DocCommentsBeforeModifiersTests: XCTestCase {
         """
 
         testFormatting(for: input, rule: .docCommentsBeforeModifiers, exclude: [.propertyTypes])
+    }
+
+    func testIssue2216() {
+        let input = """
+        protocol TestIssue2216() {
+            /// Documentation comment explaining the function
+            /// with multiple lines of explanation
+            func method1(value: String) async
+
+            /// Documentation comment explaining the function
+            /// with multiple lines of explanation
+            func method2(value: String) async
+
+            /// Documentation comment explaining the variable
+            /// with multiple lines of explanation
+            var foo: Bar { get }
+        }
+        """
+
+        testFormatting(for: input, rule: .docCommentsBeforeModifiers)
     }
 }

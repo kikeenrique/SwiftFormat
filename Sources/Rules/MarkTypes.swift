@@ -13,14 +13,15 @@ public extension FormatRule {
         help: "Add a MARK comment before top-level types and extensions.",
         runOnceOnly: true,
         disabledByDefault: true,
-        options: ["marktypes", "typemark", "markextensions", "extensionmark", "groupedextension"],
-        sharedOptions: ["lineaftermarks", "linebreaks"]
+        options: ["mark-types", "type-mark", "mark-extensions", "extension-mark", "grouped-extension"],
+        sharedOptions: ["line-after-marks", "linebreaks"]
     ) { formatter in
         var declarations = formatter.parseDeclarations()
 
-        // Do nothing if there is only one top-level declaration in the file (excluding imports)
+        // Do nothing if there is only one top-level declaration in the file (excluding imports),
+        // or if this is a fragment.
         let declarationsWithoutImports = declarations.filter { $0.keyword != "import" }
-        guard declarationsWithoutImports.count > 1 else {
+        guard declarationsWithoutImports.count > 1, !formatter.options.fragment else {
             return
         }
 
@@ -95,7 +96,7 @@ public extension FormatRule {
             if declaration.keyword == "extension" {
                 let conformances = typeDeclaration.conformances.map(\.conformance)
                 if !conformances.isEmpty {
-                    conformanceNames = conformances.joined(separator: ", ")
+                    conformanceNames = conformances.map(\.string).joined(separator: ", ")
                 }
             }
 
@@ -105,7 +106,7 @@ public extension FormatRule {
 
             if !commentTemplate.contains("%c") {
                 markForType = commentTemplate.replacingOccurrences(of: "%t", with: typeName)
-            } else if commentTemplate.contains("%c"), let conformanceNames = conformanceNames {
+            } else if commentTemplate.contains("%c"), let conformanceNames {
                 markForType = commentTemplate
                     .replacingOccurrences(of: "%t", with: typeName)
                     .replacingOccurrences(of: "%c", with: conformanceNames)
@@ -151,7 +152,7 @@ public extension FormatRule {
             }
 
             guard let expectedCommentBody = markForType else {
-                return
+                continue
             }
 
             // When inserting a mark before the first declaration,
@@ -221,15 +222,15 @@ public extension FormatRule {
         ```diff
         + // MARK: - FooViewController
         +
-         final class FooViewController: UIViewController { }
+          final class FooViewController: UIViewController { }
 
         + // MARK: UICollectionViewDelegate
         +
-         extension FooViewController: UICollectionViewDelegate { }
+          extension FooViewController: UICollectionViewDelegate { }
 
         + // MARK: - String + FooProtocol
         +
-         extension String: FooProtocol { }
+          extension String: FooProtocol { }
         ```
         """
     }

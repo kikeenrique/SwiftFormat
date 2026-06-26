@@ -30,17 +30,17 @@ public extension FormatRule {
                // because removing them could break the build.
                formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: closureStartIndex) != closureEndIndex
             {
-                /// Whether or not this closure has a single, simple expression in its body.
-                /// These closures can always be simplified / removed regardless of the context.
+                // Whether or not this closure has a single, simple expression in its body.
+                // These closures can always be simplified / removed regardless of the context.
                 let hasSingleSimpleExpression = formatter.blockBodyHasSingleStatement(
                     atStartOfScope: closureStartIndex,
                     includingConditionalStatements: false,
                     includingReturnStatements: true
                 )
 
-                /// Whether or not this closure has a single if/switch expression in its body.
-                /// Since if/switch expressions are only valid in the `return` position or as an `=` assignment,
-                /// these closures can only sometimes be simplified / removed.
+                // Whether or not this closure has a single if/switch expression in its body.
+                // Since if/switch expressions are only valid in the `return` position or as an `=` assignment,
+                // these closures can only sometimes be simplified / removed.
                 let hasSingleConditionalExpression = !hasSingleSimpleExpression &&
                     formatter.blockBodyHasSingleStatement(
                         atStartOfScope: closureStartIndex,
@@ -100,7 +100,7 @@ public extension FormatRule {
                     var startOfScopeContainingClosure = formatter.startOfScope(at: startIndex)
                     var assignmentBeforeClosure = formatter.index(of: .operator("=", .infix), before: startIndex)
 
-                    if let assignmentBeforeClosure = assignmentBeforeClosure, formatter.isConditionalStatement(at: assignmentBeforeClosure) {
+                    if let assignmentBeforeClosure, formatter.isConditionalStatement(at: assignmentBeforeClosure) {
                         // Not valid to use conditional expression directly in condition body
                         return
                     }
@@ -118,7 +118,7 @@ public extension FormatRule {
                         potentialStartOfExpressionContainingClosure = max(startOfScope, assignmentBeforeClosure)
                     }
 
-                    if let potentialStartOfExpressionContainingClosure = potentialStartOfExpressionContainingClosure {
+                    if let potentialStartOfExpressionContainingClosure {
                         guard var startOfExpressionIndex = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: potentialStartOfExpressionContainingClosure)
                         else { return }
 

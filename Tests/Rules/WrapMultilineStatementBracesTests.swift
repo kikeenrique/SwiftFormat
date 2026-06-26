@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class WrapMultilineStatementBracesTests: XCTestCase {
+final class WrapMultilineStatementBracesTests: XCTestCase {
     func testMultilineIfBraceOnNextLine() {
         let input = """
         if firstConditional,
@@ -314,7 +314,7 @@ class WrapMultilineStatementBracesTests: XCTestCase {
         testFormatting(for: input, [output], rules: [
             .wrapMultilineStatementBraces,
             .indent,
-        ], options: options, exclude: [.propertyTypes])
+        ], options: options, exclude: [.propertyTypes, .wrapPropertyBodies])
     }
 
     func testMultilineBraceAppliedToTrailingClosure_wrapAfterFirst() {
@@ -357,7 +357,7 @@ class WrapMultilineStatementBracesTests: XCTestCase {
         testFormatting(for: input, [], rules: [
             .wrapMultilineStatementBraces,
             .wrapArguments,
-        ], options: options, exclude: [.propertyTypes])
+        ], options: options, exclude: [.propertyTypes, .wrapPropertyBodies])
     }
 
     func testMultilineBraceAppliedToSubscriptBody() {

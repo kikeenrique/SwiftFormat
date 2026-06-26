@@ -9,12 +9,15 @@
 import XCTest
 @testable import SwiftFormat
 
-class CodeOrganizationTests: XCTestCase {
+final class CodeOrganizationTests: XCTestCase {
     func testRuleFileCodeOrganization() throws {
         for ruleFile in allRuleFiles {
             let fileName = ruleFile.lastPathComponent
             let titleCaseRuleName = fileName.replacingOccurrences(of: ".swift", with: "")
-            let ruleName = titleCaseRuleName.first!.lowercased() + titleCaseRuleName.dropFirst()
+            var ruleName = try XCTUnwrap(titleCaseRuleName.first?.lowercased()) + titleCaseRuleName.dropFirst()
+            if titleCaseRuleName == "URLMacro" {
+                ruleName = "urlMacro"
+            }
 
             let content = try String(contentsOf: ruleFile)
             let formatter = Formatter(tokenize(content))
@@ -22,7 +25,7 @@ class CodeOrganizationTests: XCTestCase {
             let extensions = declarations.filter { $0.keyword == "extension" }
 
             for extensionDecl in extensions {
-                let extendedType = extensionDecl.name!
+                let extendedType = try XCTUnwrap(extensionDecl.name)
                 let extensionVisibility = extensionDecl.visibility() ?? .internal
 
                 if extendedType == "FormatRule" {
@@ -103,7 +106,9 @@ class CodeOrganizationTests: XCTestCase {
                 // If this is a function call, parse the labels to disambiguate
                 // between methods with the same base name
                 var functionCallArguments: [String?]?
-                if let functionCallStartOfScope = formatter.index(of: .startOfScope("("), after: index) {
+                if let functionCallStartOfScope = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: index),
+                   formatter.tokens[functionCallStartOfScope] == .startOfScope("(")
+                {
                     functionCallArguments = formatter.parseFunctionCallArguments(startOfScope: functionCallStartOfScope).map(\.label)
                 }
 
@@ -116,7 +121,7 @@ class CodeOrganizationTests: XCTestCase {
                 let fullHelperName: String
                 if let argumentLabels = matchingHelper.funcArgLabels {
                     let argumentLabelStrings = argumentLabels.map { label -> String in
-                        if let label = label {
+                        if let label {
                             return label + ":"
                         } else {
                             return "_:"
@@ -137,18 +142,25 @@ class CodeOrganizationTests: XCTestCase {
         }
     }
 
-    func testRuleTestFilesHaveMatchingRule() {
+    func testRuleTestFilesHaveMatchingRule() throws {
         let allRuleNames = Set(allRuleFiles.map { ruleFile -> String in
             let fileName = ruleFile.lastPathComponent
             let titleCaseRuleName = fileName.replacingOccurrences(of: ".swift", with: "")
-            return titleCaseRuleName.first!.lowercased() + titleCaseRuleName.dropFirst()
+            var ruleName = titleCaseRuleName.first!.lowercased() + titleCaseRuleName.dropFirst()
+            if titleCaseRuleName == "URLMacro" {
+                ruleName = "urlMacro"
+            }
+            return ruleName
         })
 
         for testFile in allRuleTestFiles {
             let testFileName = testFile.lastPathComponent
             let expectedTestClassName = testFileName.replacingOccurrences(of: ".swift", with: "")
-            let titleCaseRuleName = expectedTestClassName.replacingOccurrences(of: "Tests", with: "")
-            let ruleName = titleCaseRuleName.first!.lowercased() + titleCaseRuleName.dropFirst()
+            let titleCaseRuleName = expectedTestClassName.hasSuffix("Tests") ? String(expectedTestClassName.dropLast(5)) : expectedTestClassName
+            var ruleName = try XCTUnwrap(titleCaseRuleName.first?.lowercased()) + titleCaseRuleName.dropFirst()
+            if titleCaseRuleName == "URLMacro" {
+                ruleName = "urlMacro"
+            }
 
             XCTAssert(allRuleNames.contains(ruleName), """
             \(testFileName) has no matching rule named \(ruleName).
@@ -171,9 +183,51 @@ class CodeOrganizationTests: XCTestCase {
 
             let expectedTestClassName = testFileName.replacingOccurrences(of: ".swift", with: "")
 
-            XCTAssertEqual(testClass.name!, expectedTestClassName, """
+            XCTAssertEqual(try XCTUnwrap(testClass.name), expectedTestClassName, """
             class \(testClass.name!) and file \(testFileName) should have same name.
             """)
+        }
+    }
+
+    func testTestCasesUseMultiLineStrings() throws {
+        for ruleTestFile in allRuleTestFiles {
+            let content = try String(contentsOf: ruleTestFile)
+            let formatter = Formatter(tokenize(content))
+            var hasChanges = false
+
+            formatter.forEach(.keyword) { index, keyword in
+                guard ["let", "var"].contains(keyword.string),
+                      let propertyDeclaration = formatter.parsePropertyDeclaration(atIntroducerIndex: index),
+                      let valueRange = propertyDeclaration.value?.expressionRange,
+                      formatter.tokens[valueRange.lowerBound] == .startOfScope("\""),
+                      let endOfString = formatter.endOfScope(at: valueRange.lowerBound)
+                else { return }
+
+                let startOfString = valueRange.lowerBound
+                let stringBodyRange = (startOfString + 1) ..< endOfString
+
+                let stringContent = formatter.tokens[stringBodyRange].map(\.string).joined()
+                let currentIndent = formatter.currentIndentForLine(at: startOfString)
+                let convertedContent = stringContent.replacingOccurrences(of: "\\n", with: "\n\(currentIndent)")
+
+                let newTokens: [Token] = [
+                    .startOfScope("\"\"\""),
+                    .linebreak("\n", 0),
+                    .space(currentIndent),
+                    .stringBody(convertedContent),
+                    .linebreak("\n", 0),
+                    .space(currentIndent),
+                    .endOfScope("\"\"\""),
+                ]
+
+                formatter.replaceTokens(in: startOfString ... endOfString, with: newTokens)
+                hasChanges = true
+            }
+
+            if hasChanges {
+                try formatter.tokens.string.write(to: ruleTestFile, atomically: true, encoding: .utf8)
+                XCTFail("Updated test cases in \(ruleTestFile.lastPathComponent) to use multi-line strings.")
+            }
         }
     }
 }

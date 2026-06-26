@@ -31,10 +31,10 @@ private let changelogTitles: [Substring] = {
     return matches
 }()
 
-class MetadataTests: XCTestCase {
+final class MetadataTests: XCTestCase {
     // MARK: generate Rules.md
 
-    // NOTE: if test fails, just run it again locally to update rules file
+    /// NOTE: if test fails, just run it again locally to update rules file
     func testGenerateRulesDocumentation() throws {
         var result = "# Default Rules (enabled by default)\n"
         for rule in FormatRules.default {
@@ -67,7 +67,7 @@ class MetadataTests: XCTestCase {
             if !rule.options.isEmpty {
                 result += "\n\nOption | Description\n--- | ---"
                 for option in rule.options {
-                    let descriptor = Descriptors.byName[option]!
+                    let descriptor = try XCTUnwrap(Descriptors.byName[option])
                     guard !descriptor.isDeprecated else {
                         continue
                     }
@@ -121,6 +121,51 @@ class MetadataTests: XCTestCase {
         }
     }
 
+    func testRuleExampleDiffsAreValid() throws {
+        for rule in FormatRules.all {
+            guard let examples = rule.examples else { continue }
+
+            // Parse all diff code blocks in the examples and validate they don't have unbalanced tokens
+            let codeBlocks: [MarkdownCodeBlock]
+            do {
+                codeBlocks = try parseCodeBlocks(fromMarkdown: examples, language: "diff")
+            } catch {
+                XCTFail("Error parsing ```diff code blocks in \(rule.name) rule examples: \(error)")
+                continue
+            }
+
+            // Collect all invalid lines for this rule
+            var invalidLines: [Int] = []
+
+            // Validate diff formatting for each code block
+            for codeBlock in codeBlocks {
+                let lines = codeBlock.text.components(separatedBy: .newlines)
+                for (lineIndex, line) in lines.enumerated() {
+                    guard !line.isEmpty else { continue }
+
+                    // Check diff formatting: first column must be space/+/-, second column must be space
+                    let firstChar = try XCTUnwrap(line.first)
+                    let secondChar = line.count >= 2 ? line[line.index(line.startIndex, offsetBy: 1)] : " "
+
+                    let isValidDiffLine = (firstChar == " " || firstChar == "+" || firstChar == "-") &&
+                        (line.count < 2 || secondChar == " ")
+
+                    if !isValidDiffLine {
+                        invalidLines.append(lineIndex + 1)
+                    }
+                }
+            }
+
+            XCTAssert(
+                invalidLines.isEmpty,
+                """
+                \(rule.name) rule has invalid example diff formatting. \ 
+                Each line must start with space/+/- followed by a space.
+                """
+            )
+        }
+    }
+
     // MARK: options
 
     func testRulesOptions() throws {
@@ -129,6 +174,12 @@ class MetadataTests: XCTestCase {
         var optionsByProperty = [String: OptionDescriptor]()
         for descriptor in Descriptors.formatting.reversed() {
             optionsByProperty[descriptor.propertyName] = descriptor
+
+            XCTAssertFalse(descriptor.help.hasSuffix("."),
+                           "\(descriptor.argumentName) option help ends with a spurious period")
+
+            XCTAssertFalse(descriptor.help.hasSuffix(" "),
+                           "\(descriptor.argumentName) option help has a trailing space")
         }
         for rulesFile in allRuleFiles {
             let rulesSource = try String(contentsOf: rulesFile, encoding: .utf8)
@@ -187,6 +238,7 @@ class MetadataTests: XCTestCase {
                             Descriptors.indent, Descriptors.tabWidth, Descriptors.smartTabs, Descriptors.maxWidth,
                             Descriptors.assetLiteralWidth, Descriptors.wrapReturnType, Descriptors.wrapEffects,
                             Descriptors.wrapConditions, Descriptors.wrapTypealiases, Descriptors.wrapTernaryOperators,
+                            Descriptors.wrapStringInterpolation, Descriptors.allowPartialWrapping,
                         ]
                     case .identifier("wrapStatementBody"):
                         referencedOptions += [Descriptors.indent, Descriptors.linebreak]
@@ -236,22 +288,12 @@ class MetadataTests: XCTestCase {
     func testNoInvalidOptionsInRulesFile() {
         let arguments = Set(commandLineArguments)
         var range = rulesFile.startIndex ..< rulesFile.endIndex
-        while let match = rulesFile.range(of: "`--[a-zA-Z]+[` ]", options: .regularExpression, range: range, locale: nil) {
+        while let match = rulesFile.range(of: "`--[a-zA-Z-]+[` ]", options: .regularExpression, range: range, locale: nil) {
             let lower = rulesFile.index(match.lowerBound, offsetBy: 3)
             let upper = rulesFile.index(before: match.upperBound)
             let argument = String(rulesFile[lower ..< upper])
             XCTAssertTrue(arguments.contains(argument), argument)
             range = match.upperBound ..< range.upperBound
-        }
-    }
-
-    func testArgumentNamesAreValidLength() {
-        let arguments = Set(commandLineArguments).subtracting(deprecatedArguments)
-        for argument in arguments {
-            XCTAssert(
-                argument.count <= Options.maxArgumentNameLength,
-                "\"\(argument)\" (length=\(argument.count)) longer than maximum allowed argument name length \(Options.maxArgumentNameLength)"
-            )
         }
     }
 
@@ -291,7 +333,7 @@ class MetadataTests: XCTestCase {
                 else {
                     return
                 }
-                guard keywords.contains(keyword) || keyword.hasPrefix("#") || keyword.hasPrefix("@") else {
+                guard keywords.contains(keyword) || keyword.isMacroOrCompilerDirective || keyword.isAttribute else {
                     let line = formatter.originalLine(at: i)
                     XCTFail("'\(keyword)' referenced on line \(line) of '\(sourceFile)' is not a valid Swift keyword. "
                         + "Contextual keywords should be referenced with `.identifier(...)`")
@@ -303,15 +345,15 @@ class MetadataTests: XCTestCase {
 
     // MARK: releases
 
-    func testLatestVersionInChangelog() {
-        let changelog = try! String(contentsOf: changeLogURL, encoding: .utf8)
+    func testLatestVersionInChangelog() throws {
+        let changelog = try String(contentsOf: changeLogURL, encoding: .utf8)
         XCTAssertTrue(changelog.contains("[\(SwiftFormat.version)]"), "CHANGELOG.md does not mention latest release")
         XCTAssertTrue(changelog.contains("(https://github.com/nicklockwood/SwiftFormat/releases/tag/\(SwiftFormat.version))"),
                       "CHANGELOG.md does not include correct link for latest release")
     }
 
-    func testLatestVersionInPodspec() {
-        let podspec = try! String(contentsOf: podspecURL, encoding: .utf8)
+    func testLatestVersionInPodspec() throws {
+        let podspec = try String(contentsOf: podspecURL, encoding: .utf8)
         XCTAssertTrue(podspec.contains("\"version\": \"\(SwiftFormat.version)\""), "Podspec version does not match latest release")
         XCTAssertTrue(podspec.contains("\"tag\": \"\(SwiftFormat.version)\""), "Podspec tag does not match latest release")
     }
@@ -330,7 +372,7 @@ class MetadataTests: XCTestCase {
             let dateRange = try XCTUnwrap(title.range(of: " \\([^)]+\\)$", options: .regularExpression))
             let dateString = String(title[dateRange])
             let date = try XCTUnwrap(dateParser.date(from: dateString))
-            if let lastDate = lastDate, date > lastDate {
+            if let lastDate, date > lastDate {
                 XCTFail("\(title) has newer date than subsequent version (\(date) vs \(lastDate))")
                 return
             }
@@ -379,7 +421,10 @@ extension _FormatRules {
     private func validatedRuleNames() throws -> [String] {
         try allRuleFiles.map { ruleFile in
             let titleCaseRuleName = ruleFile.lastPathComponent.replacingOccurrences(of: ".swift", with: "")
-            let camelCaseRuleName = titleCaseRuleName.first!.lowercased() + titleCaseRuleName.dropFirst()
+            var camelCaseRuleName = titleCaseRuleName.first!.lowercased() + titleCaseRuleName.dropFirst()
+            if titleCaseRuleName == "URLMacro" {
+                camelCaseRuleName = "urlMacro"
+            }
             try validateRuleImplementation(for: camelCaseRuleName, in: ruleFile)
             return camelCaseRuleName
         }

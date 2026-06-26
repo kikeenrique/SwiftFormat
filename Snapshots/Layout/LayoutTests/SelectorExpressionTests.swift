@@ -3,22 +3,22 @@
 import XCTest
 @testable import Layout
 
-private class TestView: UIView {
+private final class TestView: UIView {
     @objc var action: Selector?
 }
 
-private class TestViewController: UIViewController {
+private final class TestViewController: UIViewController {
     @objc func foo(_: UIView) {
         print("It works!")
     }
 }
 
-class SelectorExpressionTests: XCTestCase {
-    func testSetControlAction() {
+final class SelectorExpressionTests: XCTestCase {
+    func testSetControlAction() throws {
         let node = LayoutNode(view: UIControl(), expressions: ["touchUpInside": "foo:"])
         let viewController = TestViewController()
         XCTAssertNoThrow(try node.mount(in: viewController))
-        let control = node.view as! UIControl
+        let control = try XCTUnwrap(node.view as? UIControl)
         XCTAssertEqual(control.actions(forTarget: viewController, forControlEvent: .touchUpInside)?.first, "foo:")
     }
 

@@ -64,13 +64,17 @@ public extension Consumer {
     }
 
     /// Will the consumer match empty input?
-    var isOptional: Bool { return _isOptional }
+    var isOptional: Bool {
+        return _isOptional
+    }
 
     /// Source location
     struct Location: Equatable {
         fileprivate var source: String.UnicodeScalarView
         public let range: Range<String.Index>
-        public var offset: (line: Int, column: Int) { _offset }
+        public var offset: (line: Int, column: Int) {
+            _offset
+        }
     }
 
     /// Abstract syntax tree returned by consumer
@@ -79,7 +83,9 @@ public extension Consumer {
         case node(Label?, [Match])
 
         /// The location of the match in the original source (if known)
-        public var location: Location? { return _location }
+        public var location: Location? {
+            return _location
+        }
 
         /// Transform generic AST to application-specific form
         public func transform(_ fn: Transform) rethrows -> Any? {
@@ -642,22 +648,22 @@ private extension Consumer {
 
 extension Consumer.Location: CustomStringConvertible {
     /// Human-readable description of the location
-    public var description: String {
+    var description: String {
         return "\(offset.line):\(offset.column)"
     }
 
     /// Equatable implementation
-    public static func == (lhs: Consumer.Location, rhs: Consumer.Location) -> Bool {
+    static func == (lhs: Consumer.Location, rhs: Consumer.Location) -> Bool {
         return lhs.range == rhs.range
     }
 
     /// Convenience constructor, used by compiled parsers
-    public static func at(_ range: Range<String.Index>, in source: String.UnicodeScalarView) -> Consumer.Location {
+    static func at(_ range: Range<String.Index>, in source: String.UnicodeScalarView) -> Consumer.Location {
         return Consumer.Location(source: source, range: range)
     }
 
     /// Convenience constructor, used for testing
-    public static func at(_ range: CountableRange<Int>) -> Consumer.Location {
+    static func at(_ range: CountableRange<Int>) -> Consumer.Location {
         let source = String(repeating: " ", count: range.upperBound).unicodeScalars
         let range = source.index(source.startIndex, offsetBy: range.lowerBound) ..< source.endIndex
         return Consumer.Location(source: source, range: range)
@@ -748,7 +754,7 @@ private extension Consumer.Charset {
 
 extension Consumer.Match: CustomStringConvertible {
     /// Lisp-like description of the AST
-    public var description: String {
+    var description: String {
         func _description(_ match: Consumer.Match, _ indent: String) -> String {
             switch match {
             case let .token(string, _):
@@ -813,7 +819,7 @@ private extension Consumer.Match {
 
 extension Consumer.Error: CustomStringConvertible {
     /// Human-readable error description
-    public var description: String {
+    var description: String {
         var token = ""
         if var remaining = remaining, let first = remaining.first {
             let whitespace = " \t\n\r".unicodeScalars

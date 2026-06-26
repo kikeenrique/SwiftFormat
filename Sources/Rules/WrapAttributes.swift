@@ -11,16 +11,14 @@ import Foundation
 public extension FormatRule {
     static let wrapAttributes = FormatRule(
         help: "Wrap @attributes onto a separate line, or keep them on the same line.",
-        options: ["funcattributes", "typeattributes", "varattributes", "storedvarattrs", "computedvarattrs", "complexattrs", "noncomplexattrs"],
-        sharedOptions: ["linebreaks", "maxwidth"]
+        options: ["func-attributes", "type-attributes", "var-attributes", "stored-var-attributes", "computed-var-attributes", "complex-attributes", "non-complex-attributes"],
+        sharedOptions: ["linebreaks", "max-width"]
     ) { formatter in
         formatter.forEach(.attribute) { i, _ in
             // Ignore sequential attributes
             guard let endIndex = formatter.endOfAttribute(at: i),
-                  var keywordIndex = formatter.index(
-                      of: .nonSpaceOrCommentOrLinebreak,
-                      after: endIndex, if: { $0.isKeyword || $0.isModifierKeyword }
-                  )
+                  var keywordIndex = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: endIndex),
+                  formatter.tokens[keywordIndex].isKeyword || formatter.isModifier(at: keywordIndex)
             else {
                 return
             }
@@ -111,7 +109,7 @@ public extension FormatRule {
         }
     } examples: {
         """
-        `--funcattributes prev-line`
+        `--func-attributes prev-line`
 
         ```diff
         - @objc func foo() {}
@@ -120,7 +118,7 @@ public extension FormatRule {
         + func foo() { }
         ```
 
-        `--funcattributes same-line`
+        `--func-attributes same-line`
 
         ```diff
         - @objc
@@ -129,7 +127,7 @@ public extension FormatRule {
         + @objc func foo() {}
         ```
 
-        `--typeattributes prev-line`
+        `--type-attributes prev-line`
 
         ```diff
         - @objc class Foo {}
@@ -138,7 +136,7 @@ public extension FormatRule {
         + class Foo { }
         ```
 
-        `--typeattributes same-line`
+        `--type-attributes same-line`
 
         ```diff
         - @objc
@@ -155,7 +153,7 @@ extension Formatter {
     ///  - any named arguments
     ///  - more than one unnamed argument
     func isComplexAttribute(at attributeIndex: Int) -> Bool {
-        assert(tokens[attributeIndex].string.hasPrefix("@"))
+        assert(tokens[attributeIndex].isAttribute)
 
         guard let startOfScopeIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: attributeIndex),
               tokens[startOfScopeIndex] == .startOfScope("("),

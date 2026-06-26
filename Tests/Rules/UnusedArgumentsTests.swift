@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class UnusedArgumentsTests: XCTestCase {
+final class UnusedArgumentsTests: XCTestCase {
     // closures
 
     func testUnusedTypedClosureArguments() {
@@ -27,67 +27,112 @@ class UnusedArgumentsTests: XCTestCase {
     }
 
     func testUnusedUntypedClosureArguments() {
-        let input = "let foo = { bar, baz in\n    print(\"Hello \\(baz)\")\n}"
-        let output = "let foo = { _, baz in\n    print(\"Hello \\(baz)\")\n}"
+        let input = """
+        let foo = { bar, baz in
+            print(\"Hello \\(baz)\")
+        }
+        """
+        let output = """
+        let foo = { _, baz in
+            print(\"Hello \\(baz)\")
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testNoRemoveClosureReturnType() {
-        let input = "let foo = { () -> Foo.Bar in baz() }"
+        let input = """
+        let foo = { () -> Foo.Bar in baz() }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testNoRemoveClosureThrows() {
-        let input = "let foo = { () throws in }"
+        let input = """
+        let foo = { () throws in }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testNoRemoveClosureTypedThrows() {
-        let input = "let foo = { () throws(Foo) in }"
+        let input = """
+        let foo = { () throws(Foo) in }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testNoRemoveClosureGenericReturnTypes() {
-        let input = "let foo = { () -> Promise<String> in bar }"
+        let input = """
+        let foo = { () -> Promise<String> in bar }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testNoRemoveClosureTupleReturnTypes() {
-        let input = "let foo = { () -> (Int, Int) in (5, 6) }"
+        let input = """
+        let foo = { () -> (Int, Int) in (5, 6) }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testNoRemoveClosureGenericArgumentTypes() {
-        let input = "let foo = { (_: Foo<Bar, Baz>) in }"
+        let input = """
+        let foo = { (_: Foo<Bar, Baz>) in }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testNoRemoveFunctionNameBeforeForLoop() {
-        let input = "{\n    func foo() -> Int {}\n    for a in b {}\n}"
-        testFormatting(for: input, rule: .unusedArguments)
+        let input = """
+        {
+            func foo() -> Int {}
+            for a in b {}
+        }
+        """
+        let output = """
+        {
+            func foo() -> Int {}
+            for _ in b {}
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testClosureTypeInClosureArgumentsIsNotMangled() {
-        let input = "{ (foo: (Int) -> Void) in }"
-        let output = "{ (_: (Int) -> Void) in }"
+        let input = """
+        { (foo: (Int) -> Void) in }
+        """
+        let output = """
+        { (_: (Int) -> Void) in }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testUnusedUnnamedClosureArguments() {
-        let input = "{ (_ foo: Int, _ bar: Int) in }"
-        let output = "{ (_: Int, _: Int) in }"
+        let input = """
+        { (_ foo: Int, _ bar: Int) in }
+        """
+        let output = """
+        { (_: Int, _: Int) in }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testUnusedInoutClosureArgumentsNotMangled() {
-        let input = "{ (foo: inout Foo, bar: inout Bar) in }"
-        let output = "{ (_: inout Foo, _: inout Bar) in }"
+        let input = """
+        { (foo: inout Foo, bar: inout Bar) in }
+        """
+        let output = """
+        { (_: inout Foo, _: inout Bar) in }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testMalformedFunctionNotMisidentifiedAsClosure() {
-        let input = "func foo() { bar(5) {} in }"
-        testFormatting(for: input, rule: .unusedArguments)
+        let input = """
+        func foo() { bar(5) {} in }
+        """
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.wrapFunctionBodies])
     }
 
     func testShadowedUsedArguments() {
@@ -187,7 +232,7 @@ class UnusedArgumentsTests: XCTestCase {
             return parser
         }
         """
-        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantProperty, .propertyTypes])
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantVariable, .propertyTypes])
     }
 
     func testShadowedClosureArgument2() {
@@ -197,7 +242,7 @@ class UnusedArgumentsTests: XCTestCase {
             return input
         }
         """
-        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantProperty])
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantVariable])
     }
 
     func testUnusedPropertyWrapperArgument() {
@@ -210,24 +255,36 @@ class UnusedArgumentsTests: XCTestCase {
     }
 
     func testUnusedThrowingClosureArgument() {
-        let input = "foo = { bar throws in \"\" }"
-        let output = "foo = { _ throws in \"\" }"
+        let input = """
+        foo = { bar throws in \"\" }
+        """
+        let output = """
+        foo = { _ throws in \"\" }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testUnusedTypedThrowingClosureArgument() {
-        let input = "foo = { bar throws(Foo) in \"\" }"
-        let output = "foo = { _ throws(Foo) in \"\" }"
+        let input = """
+        foo = { bar throws(Foo) in \"\" }
+        """
+        let output = """
+        foo = { _ throws(Foo) in \"\" }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testUsedThrowingClosureArgument() {
-        let input = "let foo = { bar throws in bar + \"\" }"
+        let input = """
+        let foo = { bar throws in bar + \"\" }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testUsedTypedThrowingClosureArgument() {
-        let input = "let foo = { bar throws(Foo) in bar + \"\" }"
+        let input = """
+        let foo = { bar throws(Foo) in bar + \"\" }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
@@ -283,7 +340,9 @@ class UnusedArgumentsTests: XCTestCase {
     }
 
     func testTrailingAsyncClosureArgumentAlreadyMarkedUnused() {
-        let input = "app.get { _ async in 5 }"
+        let input = """
+        app.get { _ async in 5 }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
@@ -399,100 +458,188 @@ class UnusedArgumentsTests: XCTestCase {
     // functions
 
     func testMarkUnusedFunctionArgument() {
-        let input = "func foo(bar: Int, baz: String) {\n    print(\"Hello \\(baz)\")\n}"
-        let output = "func foo(bar _: Int, baz: String) {\n    print(\"Hello \\(baz)\")\n}"
+        let input = """
+        func foo(bar: Int, baz: String) {
+            print(\"Hello \\(baz)\")
+        }
+        """
+        let output = """
+        func foo(bar _: Int, baz: String) {
+            print(\"Hello \\(baz)\")
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testMarkUnusedArgumentsInNonVoidFunction() {
-        let input = "func foo(bar: Int, baz: String) -> (A<B, C>, D & E, [F: G]) { return baz.quux }"
-        let output = "func foo(bar _: Int, baz: String) -> (A<B, C>, D & E, [F: G]) { return baz.quux }"
-        testFormatting(for: input, output, rule: .unusedArguments)
+        let input = """
+        func foo(bar: Int, baz: String) -> (A<B, C>, D & E, [F: G]) { return baz.quux }
+        """
+        let output = """
+        func foo(bar _: Int, baz: String) -> (A<B, C>, D & E, [F: G]) { return baz.quux }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments, exclude: [.wrapFunctionBodies])
     }
 
     func testMarkUnusedArgumentsInThrowsFunction() {
-        let input = "func foo(bar: Int, baz: String) throws {\n    print(\"Hello \\(baz)\")\n}"
-        let output = "func foo(bar _: Int, baz: String) throws {\n    print(\"Hello \\(baz)\")\n}"
+        let input = """
+        func foo(bar: Int, baz: String) throws {
+            print(\"Hello \\(baz)\")
+        }
+        """
+        let output = """
+        func foo(bar _: Int, baz: String) throws {
+            print(\"Hello \\(baz)\")
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testMarkUnusedArgumentsInOptionalReturningFunction() {
-        let input = "func foo(bar: Int, baz: String) -> String? {\n    return \"Hello \\(baz)\"\n}"
-        let output = "func foo(bar _: Int, baz: String) -> String? {\n    return \"Hello \\(baz)\"\n}"
+        let input = """
+        func foo(bar: Int, baz: String) -> String? {
+            return \"Hello \\(baz)\"
+        }
+        """
+        let output = """
+        func foo(bar _: Int, baz: String) -> String? {
+            return \"Hello \\(baz)\"
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testNoMarkUnusedArgumentsInProtocolFunction() {
-        let input = "protocol Foo {\n    func foo(bar: Int) -> Int\n    var bar: Int { get }\n}"
+        let input = """
+        protocol Foo {
+            func foo(bar: Int) -> Int
+            var bar: Int { get }
+        }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testUnusedUnnamedFunctionArgument() {
-        let input = "func foo(_ foo: Int) {}"
-        let output = "func foo(_: Int) {}"
+        let input = """
+        func foo(_ foo: Int) {}
+        """
+        let output = """
+        func foo(_: Int) {}
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testUnusedInoutFunctionArgumentIsNotMangled() {
-        let input = "func foo(_ foo: inout Foo) {}"
-        let output = "func foo(_: inout Foo) {}"
+        let input = """
+        func foo(_ foo: inout Foo) {}
+        """
+        let output = """
+        func foo(_: inout Foo) {}
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testUnusedInternallyRenamedFunctionArgument() {
-        let input = "func foo(foo bar: Int) {}"
-        let output = "func foo(foo _: Int) {}"
+        let input = """
+        func foo(foo bar: Int) {}
+        """
+        let output = """
+        func foo(foo _: Int) {}
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testNoMarkProtocolFunctionArgument() {
-        let input = "func foo(foo bar: Int)\nvar bar: Bool { get }"
-        testFormatting(for: input, rule: .unusedArguments)
+        let input = """
+        func foo(foo bar: Int)
+        var bar: Bool { get }
+        """
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.wrapPropertyBodies])
     }
 
     func testMembersAreNotArguments() {
-        let input = "func foo(bar: Int, baz: String) {\n    print(\"Hello \\(bar.baz)\")\n}"
-        let output = "func foo(bar: Int, baz _: String) {\n    print(\"Hello \\(bar.baz)\")\n}"
+        let input = """
+        func foo(bar: Int, baz: String) {
+            print(\"Hello \\(bar.baz)\")
+        }
+        """
+        let output = """
+        func foo(bar: Int, baz _: String) {
+            print(\"Hello \\(bar.baz)\")
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testLabelsAreNotArguments() {
-        let input = "func foo(bar: Int, baz: String) {\n    bar: while true { print(baz) }\n}"
-        let output = "func foo(bar _: Int, baz: String) {\n    bar: while true { print(baz) }\n}"
+        let input = """
+        func foo(bar: Int, baz: String) {
+            bar: while true { print(baz) }
+        }
+        """
+        let output = """
+        func foo(bar _: Int, baz: String) {
+            bar: while true { print(baz) }
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments, exclude: [.wrapLoopBodies])
     }
 
     func testDictionaryLiteralsRuinEverything() {
-        let input = "func foo(bar: Int, baz: Int) {\n    let quux = [bar: 1, baz: 2]\n}"
+        let input = """
+        func foo(bar: Int, baz: Int) {
+            let quux = [bar: 1, baz: 2]
+        }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testOperatorArgumentsAreUnnamed() {
-        let input = "func == (lhs: Int, rhs: Int) { false }"
-        let output = "func == (_: Int, _: Int) { false }"
-        testFormatting(for: input, output, rule: .unusedArguments)
+        let input = """
+        func == (lhs: Int, rhs: Int) { false }
+        """
+        let output = """
+        func == (_: Int, _: Int) { false }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments, exclude: [.wrapFunctionBodies])
     }
 
     func testUnusedtFailableInitArgumentsAreNotMangled() {
-        let input = "init?(foo: Bar) {}"
-        let output = "init?(foo _: Bar) {}"
+        let input = """
+        init?(foo: Bar) {}
+        """
+        let output = """
+        init?(foo _: Bar) {}
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testTreatEscapedArgumentsAsUsed() {
-        let input = "func foo(default: Int) -> Int {\n    return `default`\n}"
+        let input = """
+        func foo(default: Int) -> Int {
+            return `default`
+        }
+        """
         testFormatting(for: input, rule: .unusedArguments)
     }
 
     func testPartiallyMarkedUnusedArguments() {
-        let input = "func foo(bar: Bar, baz _: Baz) {}"
-        let output = "func foo(bar _: Bar, baz _: Baz) {}"
+        let input = """
+        func foo(bar: Bar, baz _: Baz) {}
+        """
+        let output = """
+        func foo(bar _: Bar, baz _: Baz) {}
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testPartiallyMarkedUnusedArguments2() {
-        let input = "func foo(bar _: Bar, baz: Baz) {}"
-        let output = "func foo(bar _: Bar, baz _: Baz) {}"
+        let input = """
+        func foo(bar _: Bar, baz: Baz) {}
+        """
+        let output = """
+        func foo(bar _: Bar, baz _: Baz) {}
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
@@ -522,7 +669,7 @@ class UnusedArgumentsTests: XCTestCase {
             print(bar, baz)
         }
         """
-        testFormatting(for: input, output, rule: .unusedArguments)
+        testFormatting(for: input, output, rule: .unusedArguments, exclude: [.singlePropertyPerLine])
     }
 
     func testShadowedUsedArguments2() {
@@ -607,7 +754,7 @@ class UnusedArgumentsTests: XCTestCase {
             return bar
         }
         """
-        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantProperty])
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantVariable])
     }
 
     func testTryAwaitArgumentNotMarkedUnused() {
@@ -618,7 +765,7 @@ class UnusedArgumentsTests: XCTestCase {
             return bar
         }
         """
-        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantProperty])
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantVariable])
     }
 
     func testTypedTryAwaitArgumentNotMarkedUnused() {
@@ -629,7 +776,7 @@ class UnusedArgumentsTests: XCTestCase {
             return bar
         }
         """
-        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantProperty])
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantVariable])
     }
 
     func testConditionalIfLetMarkedAsUnused() {
@@ -741,7 +888,7 @@ class UnusedArgumentsTests: XCTestCase {
             print(foo, bar, baz)
         }
         """
-        testFormatting(for: input, output, rule: .unusedArguments)
+        testFormatting(for: input, output, rule: .unusedArguments, exclude: [.singlePropertyPerLine])
     }
 
     func testUnusedParamsInTupleAssignment() {
@@ -757,7 +904,7 @@ class UnusedArgumentsTests: XCTestCase {
             print(foo, bar, baz, quux)
         }
         """
-        testFormatting(for: input, output, rule: .unusedArguments)
+        testFormatting(for: input, output, rule: .unusedArguments, exclude: [.singlePropertyPerLine])
     }
 
     func testShadowedIfLetNotMarkedAsUnused() {
@@ -789,7 +936,7 @@ class UnusedArgumentsTests: XCTestCase {
             var foo, bar: Int?
         }
         """
-        testFormatting(for: input, output, rule: .unusedArguments)
+        testFormatting(for: input, output, rule: .unusedArguments, exclude: [.singlePropertyPerLine])
     }
 
     func testShadowedClosureNotMarkedUnused() {
@@ -827,7 +974,7 @@ class UnusedArgumentsTests: XCTestCase {
 
     func testViewBuilderAnnotationDoesntBreakUnusedArgDetection() {
         let input = """
-        struct Foo {
+        public struct Foo {
             let content: View
 
             public init(
@@ -839,7 +986,7 @@ class UnusedArgumentsTests: XCTestCase {
         }
         """
         let output = """
-        struct Foo {
+        public struct Foo {
             let content: View
 
             public init(
@@ -992,7 +1139,11 @@ class UnusedArgumentsTests: XCTestCase {
     // functions (closure-only)
 
     func testNoMarkFunctionArgument() {
-        let input = "func foo(_ bar: Int, baz: String) {\n    print(\"Hello \\(baz)\")\n}"
+        let input = """
+        func foo(_ bar: Int, baz: String) {
+            print(\"Hello \\(baz)\")
+        }
+        """
         let options = FormatOptions(stripUnusedArguments: .closureOnly)
         testFormatting(for: input, rule: .unusedArguments, options: options)
     }
@@ -1010,14 +1161,20 @@ class UnusedArgumentsTests: XCTestCase {
     }
 
     func testRemoveUnnamedFunctionArgument() {
-        let input = "func foo(_ foo: Int) {}"
-        let output = "func foo(_: Int) {}"
+        let input = """
+        func foo(_ foo: Int) {}
+        """
+        let output = """
+        func foo(_: Int) {}
+        """
         let options = FormatOptions(stripUnusedArguments: .unnamedOnly)
         testFormatting(for: input, output, rule: .unusedArguments, options: options)
     }
 
     func testNoRemoveInternalFunctionArgumentName() {
-        let input = "func foo(foo bar: Int) {}"
+        let input = """
+        func foo(foo bar: Int) {}
+        """
         let options = FormatOptions(stripUnusedArguments: .unnamedOnly)
         testFormatting(for: input, rule: .unusedArguments, options: options)
     }
@@ -1047,20 +1204,44 @@ class UnusedArgumentsTests: XCTestCase {
     // subscript
 
     func testMarkUnusedSubscriptArgument() {
-        let input = "subscript(foo: Int, baz: String) -> String {\n    return get(baz)\n}"
-        let output = "subscript(_: Int, baz: String) -> String {\n    return get(baz)\n}"
+        let input = """
+        subscript(foo: Int, baz: String) -> String {
+            return get(baz)
+        }
+        """
+        let output = """
+        subscript(_: Int, baz: String) -> String {
+            return get(baz)
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testMarkUnusedUnnamedSubscriptArgument() {
-        let input = "subscript(_ foo: Int, baz: String) -> String {\n    return get(baz)\n}"
-        let output = "subscript(_: Int, baz: String) -> String {\n    return get(baz)\n}"
+        let input = """
+        subscript(_ foo: Int, baz: String) -> String {
+            return get(baz)
+        }
+        """
+        let output = """
+        subscript(_: Int, baz: String) -> String {
+            return get(baz)
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
     func testMarkUnusedNamedSubscriptArgument() {
-        let input = "subscript(foo foo: Int, baz: String) -> String {\n    return get(baz)\n}"
-        let output = "subscript(foo _: Int, baz: String) -> String {\n    return get(baz)\n}"
+        let input = """
+        subscript(foo foo: Int, baz: String) -> String {
+            return get(baz)
+        }
+        """
+        let output = """
+        subscript(foo _: Int, baz: String) -> String {
+            return get(baz)
+        }
+        """
         testFormatting(for: input, output, rule: .unusedArguments)
     }
 
@@ -1149,7 +1330,7 @@ class UnusedArgumentsTests: XCTestCase {
             }
         }
         """
-        testFormatting(for: input, rule: .unusedArguments, exclude: [.wrapConditionalBodies, .redundantProperty])
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.wrapConditionalBodies, .redundantVariable])
     }
 
     func testIssue1694() {
@@ -1175,7 +1356,7 @@ class UnusedArgumentsTests: XCTestCase {
             return parameter
         }
         """
-        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantProperty])
+        testFormatting(for: input, rule: .unusedArguments, exclude: [.redundantVariable])
     }
 
     func testArgumentUsedInsideMultilineStringLiteral() {
@@ -1336,5 +1517,368 @@ class UnusedArgumentsTests: XCTestCase {
         """
 
         testFormatting(for: input, output, rule: .unusedArguments, exclude: [.trailingCommas])
+    }
+
+    func testArgumentUsedInMacroTreatedAsUsed() {
+        let input = """
+        @Test
+        func something(value: String?) throws {
+            let value = try #require(value)
+            print(value)
+        }
+        """
+
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testIfdefCrash() {
+        let input = """
+        func test(unused: Int) {
+            foo {
+                if true {
+                    #if FOO
+                        switch 1 {
+                        default: ()
+                        }
+                    #endif
+                } else if true {
+                    ()
+                }
+            }
+        }
+        """
+        let output = """
+        func test(unused _: Int) {
+            foo {
+                if true {
+                    #if FOO
+                        switch 1 {
+                        default: ()
+                        }
+                    #endif
+                } else if true {
+                    ()
+                }
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    // for loops
+
+    func testUnusedForLoopVariable() {
+        let input = """
+        for value in array {
+            print("hello")
+        }
+        """
+        let output = """
+        for _ in array {
+            print("hello")
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    func testUsedForLoopVariable() {
+        let input = """
+        for value in array {
+            print(value)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testUnusedForLoopTupleVariable() {
+        let input = """
+        for (key, value) in dictionary {
+            print(key)
+        }
+        """
+        let output = """
+        for (key, _) in dictionary {
+            print(key)
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    func testUnusedForLoopTupleVariables() {
+        let input = """
+        for (key, value) in dictionary {
+            print("hello")
+        }
+        """
+        let output = """
+        for (_, _) in dictionary {
+            print("hello")
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    func testUsedForLoopTupleVariables() {
+        let input = """
+        for (key, value) in dictionary {
+            print(key, value)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableAlreadyUnderscore() {
+        let input = """
+        for _ in array {
+            print("hello")
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopTupleVariableAlreadyUnderscore() {
+        let input = """
+        for (key, _) in dictionary {
+            print(key)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableUsedInWhereClause() {
+        let input = """
+        for value in array where value > 0 {
+            print("positive")
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableUnusedWithClosureOnlyOption() {
+        let input = """
+        for value in array {
+            print("hello")
+        }
+        """
+        let options = FormatOptions(stripUnusedArguments: .closureOnly)
+        testFormatting(for: input, rule: .unusedArguments, options: options)
+    }
+
+    func testForLoopVariableUnusedWithUnnamedOnlyOption() {
+        let input = """
+        for value in array {
+            print("hello")
+        }
+        """
+        let options = FormatOptions(stripUnusedArguments: .unnamedOnly)
+        testFormatting(for: input, rule: .unusedArguments, options: options)
+    }
+
+    func testPatternMatchingForLoopNotModified() {
+        let input = """
+        for case let .foo(bar) in array {
+            print(bar)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testUnusedPatternMatchingForLoopVariableNotModified() {
+        let input = """
+        for case let .foo(bar) in array {
+            print("hello")
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableShadowingFunctionArgument() {
+        let input = """
+        func foo(foo: [String]) {
+            for foo in foo {
+                print(foo)
+            }
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableShadowingUnusedFunctionArgument() {
+        let input = """
+        func foo(bar: [String]) {
+            for bar in bar {
+                print(bar)
+            }
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testNestedForLoopOuterVariableUnused() {
+        let input = """
+        for outer in array {
+            for inner in outer {
+                print(inner)
+            }
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testNestedForLoopOuterVariableTrulyUnused() {
+        let input = """
+        for outer in array {
+            for inner in otherArray {
+                print(inner)
+            }
+        }
+        """
+        let output = """
+        for _ in array {
+            for inner in otherArray {
+                print(inner)
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    func testNestedForLoopInnerVariableUnused() {
+        let input = """
+        for outer in array {
+            for inner in outer {
+                print(outer)
+            }
+        }
+        """
+        let output = """
+        for outer in array {
+            for _ in outer {
+                print(outer)
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    func testForLoopInsideFunctionBody() {
+        let input = """
+        func processItems(_ items: [String]) {
+            for item in items {
+                print("hello")
+            }
+        }
+        """
+        let output = """
+        func processItems(_ items: [String]) {
+            for _ in items {
+                print("hello")
+            }
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    func testForLoopInsideFunctionBodyWithUsedVariable() {
+        let input = """
+        func processItems(_ items: [String]) {
+            for item in items {
+                print(item)
+            }
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testUnusedForLoopVariableWithTypeAnnotation() {
+        let input = """
+        for resizeScale: CGFloat? in [nil, 1, 2] {
+            print("hello")
+        }
+        """
+        let output = """
+        for _: CGFloat? in [nil, 1, 2] {
+            print("hello")
+        }
+        """
+        testFormatting(for: input, output, rule: .unusedArguments)
+    }
+
+    func testUsedForLoopVariableWithTypeAnnotation() {
+        let input = """
+        for resizeScale: CGFloat? in [nil, 1, 2] {
+            print(resizeScale)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testEscapedKeywordForLoopVariableNotReplaced() {
+        let input = """
+        for `extension` in extensions {
+            print(`extension`)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableUsedInGuardLetWithTryAwait() {
+        let input = """
+        for item in items {
+            guard let item = try? await storage.record(
+                matching: item.id
+            ) else {
+                return
+            }
+
+            storage.save(item)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableUsedInGuardLetWithTryForceAwait() {
+        let input = """
+        for item in items {
+            guard let item = try! await storage.record(
+                matching: item.id
+            ) else {
+                return
+            }
+
+            storage.save(item)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableUsedInGuardLetWithTryOptional() {
+        let input = """
+        for item in items {
+            guard let item = try? storage.record(
+                matching: item.id
+            ) else {
+                return
+            }
+
+            storage.save(item)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
+    }
+
+    func testForLoopVariableUsedInGuardLetWithTryForce() {
+        let input = """
+        for item in items {
+            guard let item = try! storage.record(
+                matching: item.id
+            ) else {
+                return
+            }
+
+            storage.save(item)
+        }
+        """
+        testFormatting(for: input, rule: .unusedArguments)
     }
 }

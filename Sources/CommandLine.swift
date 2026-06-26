@@ -78,9 +78,9 @@ private func print(_ message: String, as type: CLI.OutputType = .info) {
 private func printWarnings(_ errors: [Error]) -> Bool {
     var containsError = false
     for error in errors {
-        var errorMessage = "\(error)"
-        if !".?!".contains(errorMessage.last ?? " ") {
-            errorMessage += "."
+        var message = "\(error)"
+        if !".?!".contains(message.last ?? " ") {
+            message += "."
         }
         let isError: Bool
         switch error as? FormatError {
@@ -90,13 +90,13 @@ private func printWarnings(_ errors: [Error]) -> Bool {
             isError = true
         case nil:
             isError = true
-            errorMessage = error.localizedDescription
+            message = error.localizedDescription
         }
         if isError {
             containsError = true
-            print("error: \(errorMessage)", as: .error)
+            print("error: \(message)", as: .error)
         } else {
-            print("warning: \(errorMessage)", as: .warning)
+            print("warning: \(message)", as: .warning)
         }
     }
     return containsError
@@ -109,23 +109,39 @@ public enum ExitCode: Int32 {
     case error = 70 // EX_SOFTWARE
 }
 
-func printOptions(as type: CLI.OutputType) {
-    print("")
-    print(Descriptors.formatting.compactMap {
+private func formatOptions(_ options: [OptionDescriptor]) -> String {
+    options.compactMap {
         guard !$0.isDeprecated else { return nil }
         var result = "--\($0.argumentName)"
-        for _ in 0 ..< Options.maxArgumentNameLength + 3 - result.count {
-            result += " "
+
+        let maxNameLengthForSingleLineFormatting = 16
+        let optionNameColumnWidth = maxNameLengthForSingleLineFormatting + 3
+
+        if $0.argumentName.count <= maxNameLengthForSingleLineFormatting {
+            for _ in 0 ..< optionNameColumnWidth - result.count {
+                result += " "
+            }
+            return result + stripMarkdown($0.help)
+        } else {
+            result += "\n"
+            for _ in 0 ..< optionNameColumnWidth {
+                result += " "
+            }
+            return result + stripMarkdown($0.help)
         }
-        return result + stripMarkdown($0.help)
-    }.sorted().joined(separator: "\n"), as: type)
+    }.sorted().joined(separator: "\n")
+}
+
+func printOptions(_ options: [OptionDescriptor] = Descriptors.formatting, as type: CLI.OutputType) {
+    print("")
+    print(formatOptions(options), as: type)
     print("")
 }
 
 func printRuleInfo(for name: String, as type: CLI.OutputType) throws {
     guard let rule = FormatRules.byName[name] else {
         if name.isEmpty {
-            throw FormatError.options("--ruleinfo command expects a rule name")
+            throw FormatError.options("--rule-info command expects a rule name")
         }
         throw FormatError.options("'\(name)' rule does not exist")
     }
@@ -141,16 +157,12 @@ func printRuleInfo(for name: String, as type: CLI.OutputType) throws {
     }
     if !rule.options.isEmpty {
         print("\nOptions:\n", as: type)
-        print(rule.options.compactMap {
+        print(formatOptions(rule.options.compactMap {
             guard let descriptor = Descriptors.byName[$0], !descriptor.isDeprecated else {
                 return nil
             }
-            var result = "--\(descriptor.argumentName)"
-            for _ in 0 ..< 19 - result.count {
-                result += " "
-            }
-            return result + stripMarkdown(descriptor.help)
-        }.sorted().joined(separator: "\n"), as: type)
+            return descriptor
+        }), as: type)
     }
     if var examples = rule.examples {
         examples = examples
@@ -176,28 +188,30 @@ func printHelp(as type: CLI.OutputType) {
 
     SwiftFormat can operate on files & directories, or directly on input from stdin.
 
-    Usage: swiftformat [<file> <file> ...] [--inferoptions] [--output path] [...]
+    Usage: swiftformat [<file> <file> ...] [--infer-options] [--output path] [...]
 
     <file> <file> ...  Swift files or directories to be processed, or "stdin"
 
     --filelist         Path to a file with names of files to process, one per line
-    --stdinpath        Path to stdin source file (used for generating header)
-    --scriptinput      Read Xcode SCRIPT_INPUT_FILE* environment variables as files
-    --config           Path to a configuration file containing rules and options
-    --baseconfig       Like --config, but local .swiftformat files aren't ignored
-    --inferoptions     Instead of formatting input, use it to infer format options
+    --stdin-path       Path to stdin source file (used for generating header)
+    --script-input     Read Xcode SCRIPT_INPUT_FILE* environment variables as files
+    --config           Path(s) to configuration file(s) containing rules and options
+    --base-config      Like --config, but local .swiftformat files aren't ignored
+    --infer-options    Instead of formatting input, use it to infer format options
     --output           Output path for formatted file(s) (defaults to input path)
     --exclude          Comma-delimited list of ignored paths (supports glob syntax)
     --unexclude        Paths to not exclude, even if excluded elsewhere in config
+    --filter           Filters a config file to only apply to paths matching a glob.
     --symlinks         How symlinks are handled: "follow" or "ignore" (default)
-    --linerange        Range of lines to process within the input file (first, last)
+    --line-range       Range of lines to process within the input file (first, last)
     --fragment         \(stripMarkdown(Descriptors.fragment.help))
-    --conflictmarkers  \(stripMarkdown(Descriptors.ignoreConflictMarkers.help))
-    --swiftversion     \(stripMarkdown(Descriptors.swiftVersion.help))
-    --languagemode     \(stripMarkdown(Descriptors.languageMode.help))
-    --minversion       The minimum SwiftFormat version to be used for these files
+    --conflict-markers \(stripMarkdown(Descriptors.ignoreConflictMarkers.help))
+    --swift-version    \(stripMarkdown(Descriptors.swiftVersion.help))
+    --language-mode    \(stripMarkdown(Descriptors.languageMode.help))
+    --unknown-rules    How unknown rules are handled: "error" (default) or "ignore"
+    --min-version      The minimum SwiftFormat version to be used for these files
     --cache            Path to cache file, or "clear" or "ignore" the default cache
-    --dryrun           Run in "dry" mode (without actually changing any files)
+    --dry-run          Run in "dry" mode (without actually changing any files)
     --lint             Return an error for unformatted input, and list violations
     --report           Path to a file where --lint output should be written
     --reporter         Report format: \(Reporters.help)
@@ -205,7 +219,8 @@ func printHelp(as type: CLI.OutputType) {
     --strict           Emit errors for unformatted code when formatting
     --verbose          Display detailed formatting output and warnings/errors
     --quiet            Disables non-critical output messages and warnings
-    --outputtokens     Outputs an array of tokens instead of text when using stdin
+    --output-tokens    Outputs an array of tokens instead of text when using stdin
+    --markdown-files   \(stripMarkdown(Descriptors.markdownFiles.help))
 
     SwiftFormat has a number of rules that can be enabled or disabled. By default
     most rules are enabled. Use --rules to display all enabled/disabled rules.
@@ -213,12 +228,12 @@ func printHelp(as type: CLI.OutputType) {
     --rules            The list of rules to apply. Pass nothing to print rules list
     --disable          Comma-delimited list of format rules to be disabled, or "all"
     --enable           Comma-delimited list of rules to be enabled, or "all"
-    --lintonly         A list of rules to be enabled only when using --lint mode
+    --lint-only        A list of rules to be enabled only when using --lint mode
 
     SwiftFormat's rules can be configured using options. A given option may affect
     multiple rules. Options have no effect if the related rules have been disabled.
 
-    --ruleinfo         Display options for a given rule or rules (comma-delimited)
+    --rule-info        Display options for a given rule or rules (comma-delimited)
     --options          Prints a list of all formatting options and their usage
     """, as: type)
     print("")
@@ -242,7 +257,7 @@ private func formatTime(_ time: TimeInterval) -> String {
 }
 
 private func serializeOptions(_ options: Options, to outputURL: URL?) throws {
-    if let outputURL = outputURL {
+    if let outputURL {
         let file = serialize(options: options) + "\n"
         do {
             try file.write(to: outputURL, atomically: true, encoding: .utf8)
@@ -258,49 +273,122 @@ private func serializeOptions(_ options: Options, to outputURL: URL?) throws {
 private func readConfigArg(
     _ name: String,
     with args: inout [String: String],
+    filterOptions: inout [Glob: [String: String]],
     in directory: String
 ) throws -> URL? {
-    guard let url = try args[name].map({
-        try parsePath($0, for: "--\(name)", in: directory)
-    }) else {
+    guard let configPath = args[name] else {
         return nil
     }
-    if args[name] == "" {
+    if configPath.isEmpty {
         throw FormatError.options("--\(name) argument expects a value")
     }
+
+    let (url, configs) = try processConfigFile(at: configPath, for: name, in: directory)
+
+    var config = [String: String]()
+
+    for configArgs in configs {
+        // If the config file has a `--filter` option, store it separately under that glob.
+        if let filterGlob = configArgs["filter"] {
+            for glob in expandGlobs(filterGlob, in: "/") {
+                filterOptions[glob] = configArgs
+            }
+        } else {
+            config = try mergeArguments(configArgs, into: config)
+        }
+    }
+
+    args = try mergeArguments(args, into: config)
+    return url
+}
+
+private func processConfigFile(at path: String, for argumentName: String, in directory: String) throws -> (URL, [[String: String]]) {
+    let url = try parsePath(path, for: "--\(argumentName)", in: directory)
+
     if !FileManager.default.fileExists(atPath: url.path) {
         throw FormatError.reading("Specified config file does not exist: \(url.path)")
     }
+
     let data: Data
     do {
         data = try Data(contentsOf: url)
     } catch {
         throw FormatError.reading("Failed to read config file at \(url.path), \(error)")
     }
-    var config = try parseConfigFile(data)
+
+    var configs = try parseConfigFile(data)
+
     // Ensure exclude paths in config file are treated as relative to the file itself
-    // TODO: find a better way/place to do this
-    let directory = url.deletingLastPathComponent().path
-    if let exclude = config["exclude"] {
-        let excluded = expandGlobs(exclude, in: directory)
-        if excluded.isEmpty {
-            print("warning: --exclude value '\(exclude)' did not match any files in \(directory).", as: .warning)
-            config["exclude"] = nil
-        } else {
-            config["exclude"] = excluded.map(\.description).sorted().joined(separator: ",")
+    let configDirectory = url.deletingLastPathComponent().path
+
+    configs = configs.map { config in
+        var config = config
+        if let exclude = config["exclude"] {
+            let excluded = expandGlobs(exclude, in: configDirectory)
+            if excluded.isEmpty {
+                print("warning: --exclude value '\(exclude)' did not match any files in \(configDirectory).", as: .warning)
+                config["exclude"] = nil
+            } else {
+                config["exclude"] = excluded.map(\.description).sorted().joined(separator: ",")
+            }
         }
-    }
-    if let unexclude = config["unexclude"] {
-        let unexcluded = expandGlobs(unexclude, in: directory)
-        if unexcluded.isEmpty {
-            print("warning: --unexclude value '\(unexclude)' did not match any files in \(directory).", as: .warning)
-            config["unexclude"] = nil
-        } else {
-            config["unexclude"] = unexcluded.map(\.description).sorted().joined(separator: ",")
+        if let unexclude = config["unexclude"] {
+            let unexcluded = expandGlobs(unexclude, in: configDirectory)
+            if unexcluded.isEmpty {
+                print("warning: --unexclude value '\(unexclude)' did not match any files in \(configDirectory).", as: .warning)
+                config["unexclude"] = nil
+            } else {
+                config["unexclude"] = unexcluded.map(\.description).sorted().joined(separator: ",")
+            }
         }
+        return config
     }
-    args = try mergeArguments(args, into: config)
-    return url
+
+    return (url, configs)
+}
+
+private func readMultipleConfigArgs(
+    _ name: String,
+    with args: inout [String: String],
+    filterOptions: inout [Glob: [String: String]],
+    in directory: String
+) throws -> [URL] {
+    guard let configPaths = args[name] else {
+        return []
+    }
+
+    if configPaths.isEmpty {
+        throw FormatError.options("--\(name) argument expects a value")
+    }
+
+    // Split comma-separated config paths
+    let paths = parseCommaDelimitedList(configPaths)
+    var configURLs: [URL] = []
+    var mergedConfig: [String: String] = [:]
+
+    // Process each config file in order (first as base, subsequent override)
+    for (index, path) in paths.enumerated() {
+        let (url, configs) = try processConfigFile(at: path, for: name, in: directory)
+        for config in configs {
+            // For first config file, use it as base; for subsequent files, merge them in.
+            // If the config file has a `--filter` option, store it separately under that glob.
+            if let filterGlob = config["filter"] {
+                for glob in expandGlobs(filterGlob, in: "/") {
+                    filterOptions[glob] = config
+                }
+            } else if index == 0 {
+                mergedConfig = config
+            } else {
+                mergedConfig = try mergeArguments(config, into: mergedConfig)
+            }
+        }
+
+        configURLs.append(url)
+    }
+
+    // Merge final config into args
+    args = try mergeArguments(args, into: mergedConfig)
+    return configURLs
 }
 
 typealias OutputFlags = (
@@ -342,10 +430,10 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
         let lint = (args["lint"] != nil)
 
         // Dry run
-        let dryrun = lint || (args["dryrun"] != nil)
+        let dryrun = lint || (args["dry-run"] != nil)
 
         // Whether or not to output tokens instead of source code
-        let printTokens = args["outputtokens"] != nil
+        let printTokens = args["output-tokens"] != nil
 
         // Warnings
         for warning in warningsForArguments(args) {
@@ -369,13 +457,12 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
                 named: identifier,
                 environment: environment
             ) else {
-                var message = "'\(identifier)' is not a valid reporter"
-                // swiftformat:disable:next --preferKeyPath
-                let names = Reporters.all.map { $0.name }
-                if let match = identifier.bestMatches(in: names).first {
-                    message += " (did you mean '\(match)'?)"
-                }
-                throw FormatError.options(message)
+                throw FormatError.invalidOption(
+                    identifier,
+                    for: "reporter",
+                    // swiftformat:disable:next --preferKeyPath
+                    with: Reporters.all.map { $0.name }
+                )
             }
             return reporter
         } ?? reportURL.flatMap {
@@ -406,7 +493,7 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
         }
 
         // Show rule info
-        if let names = try args["ruleinfo"].map(parseRules) {
+        if let names = try args["rule-info"].map({ try parseRules($0, ignoreUnknown: false) }) {
             let names = names.isEmpty ? allRules.sorted() : names.sorted()
             for name in names {
                 try printRuleInfo(for: name, as: .content)
@@ -423,8 +510,9 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
             return false
         } ?? false
 
-        // Config file
-        let configURL = try readConfigArg("config", with: &args, in: directory)
+        // Config files (support multiple)
+        var filterOptions = [Glob: [String: String]]()
+        let configURLs = try readMultipleConfigArgs("config", with: &args, filterOptions: &filterOptions, in: directory)
 
         // FormatOption overrides
         var overrides = [String: String]()
@@ -433,11 +521,11 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
         }
 
         // Base config
-        _ = try readConfigArg("baseconfig", with: &args, in: directory)
-        _ = try readConfigArg("config", with: &args, in: directory)
+        _ = try readConfigArg("base-config", with: &args, filterOptions: &filterOptions, in: directory)
 
         // Options
-        var options = try Options(args, in: directory)
+        var options = try Options(args, filterOptions: filterOptions, in: directory)
+        options.configURLs = configURLs.isEmpty ? nil : configURLs
 
         // Show rules
         if showRules {
@@ -488,28 +576,29 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
             }
             inputURLs = []
         }
-        if let stdinPath = args["stdinpath"] {
+        if let stdinPath = args["stdin-path"] {
             if !useStdin {
-                print("warning: --stdinpath option only applies when using stdin", as: .warning)
+                print("warning: --stdin-path option only applies when using stdin", as: .warning)
             }
-            let stdinURL = try parsePath(stdinPath, for: "stdinpath", in: directory)
-            let resourceValues = try getResourceValues(
+            let stdinURL = try parsePath(stdinPath, for: "stdin-path", in: directory)
+            // Try to get resource values, but if file doesn't exist, just use the path
+            let resourceValues = try? getResourceValues(
                 for: stdinURL.standardizedFileURL,
                 keys: [.creationDateKey, .pathKey]
             )
             var formatOptions = options.formatOptions ?? .default
 
             formatOptions.fileInfo = FileInfo(
-                filePath: resourceValues.path,
-                creationDate: resourceValues.creationDate
+                filePath: resourceValues?.path ?? stdinURL.standardizedFileURL.path,
+                creationDate: resourceValues?.creationDate
             )
             options.formatOptions = formatOptions
         }
-        if args["scriptinput"] != nil {
+        if args["script-input"] != nil {
             inputURLs += try parseScriptInput(from: environment)
         }
 
-        // Treat values for arguments that do not take a value as input paths
+        /// Treat values for arguments that do not take a value as input paths
         func addInputPaths(for argName: String) throws {
             guard let arg = args[argName], !arg.isEmpty else {
                 return
@@ -527,9 +616,9 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
         try addInputPaths(for: "verbose")
         try addInputPaths(for: "lenient")
         try addInputPaths(for: "strict")
-        try addInputPaths(for: "dryrun")
+        try addInputPaths(for: "dry-run")
         try addInputPaths(for: "lint")
-        try addInputPaths(for: "inferoptions")
+        try addInputPaths(for: "infer-options")
 
         // Output path
         var useStdout = false
@@ -553,11 +642,11 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
         }
 
         // Source range
-        let lineRange = try args["linerange"].flatMap { arg -> ClosedRange<Int>? in
+        let lineRange = try args["line-range"].flatMap { arg -> ClosedRange<Int>? in
             if arg == "" {
-                throw FormatError.options("--linerange argument expects a value")
+                throw FormatError.options("--line-range argument expects a value")
             } else if inputURLs.count > 1 {
-                throw FormatError.options("--linerange argument is only valid for a single input file")
+                throw FormatError.options("--line-range argument is only valid for a single input file")
             }
             let parts = arg.components(separatedBy: ",").map {
                 $0.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -566,18 +655,18 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
                   let start = parts.first.flatMap(Int.init),
                   let end = parts.last.flatMap(Int.init)
             else {
-                throw FormatError.options("Unsupported --linerange value '\(arg)'")
+                throw FormatError.options("Unsupported --line-range value '\(arg)'")
             }
             return start ... end
         }
 
         // Infer options
-        if args["inferoptions"] != nil {
-            guard configURL == nil else {
-                throw FormatError.options("--inferoptions option can't be used along with a config file")
+        if args["infer-options"] != nil {
+            guard configURLs.isEmpty else {
+                throw FormatError.options("--infer-options option can't be used along with a config file")
             }
             guard args["range"] == nil else {
-                throw FormatError.options("--inferoptions option can't be applied to a line range")
+                throw FormatError.options("--infer-options option can't be applied to a line range")
             }
             if !inputURLs.isEmpty {
                 print("Inferring swiftformat options from source file(s)...", as: .info)
@@ -643,7 +732,7 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
                 break
             case "clear":
                 setDefaultCacheURL()
-                if let cacheURL = cacheURL, manager.fileExists(atPath: cacheURL.path) {
+                if let cacheURL, manager.fileExists(atPath: cacheURL.path) {
                     do {
                         try manager.removeItem(at: cacheURL)
                     } catch {
@@ -684,13 +773,13 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
             while let line = CLI.readLine() {
                 input = (input ?? "") + line
             }
-            guard let input = input else {
+            guard let input else {
                 status = .finished(.ok)
                 return
             }
             do {
                 var options = options
-                if args["inferoptions"] != nil {
+                if args["infer-options"] != nil {
                     let tokens = tokenize(input)
                     options.formatOptions = inferFormatOptions(from: tokens)
                     try serializeOptions(options, to: outputURL)
@@ -705,7 +794,8 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
                             return
                         }
 
-                        let resourceValues = try getResourceValues(
+                        // Try to get resource values, but allow nil for non-existing files
+                        let resourceValues = try? getResourceValues(
                             for: stdinURL.standardizedFileURL,
                             keys: [.creationDateKey, .pathKey]
                         )
@@ -715,13 +805,14 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
                                                        resourceValues: resourceValues)
 
                         options.formatOptions?.fileInfo = fileInfo
+                        try options.addFilterArguments(path: stdinURL.path)
                     }
                     let outputTokens = try applyRules(
                         input, options: options, lineRange: lineRange,
                         verbose: verbose, lint: lint, reporter: reporter
                     )
                     let output = sourceCode(for: outputTokens)
-                    if let outputURL = outputURL, !useStdout {
+                    if let outputURL, !useStdout {
                         if !dryrun, (try? String(contentsOf: outputURL)) != output {
                             try write(output, to: outputURL)
                         }
@@ -734,7 +825,7 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
                             print(dryrun ? input : output, as: .raw)
                         }
                     } else if let reporterOutput = try reporter.write() {
-                        if let reportURL = reportURL {
+                        if let reportURL {
                             print("Writing report file to \(reportURL.path)", as: .info)
                             try reporterOutput.write(to: reportURL, options: .atomic)
                         } else {
@@ -787,8 +878,8 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
                         return exitCode
                     }
                 }
-            } else if args["inferoptions"] != nil {
-                throw FormatError.options("--inferoptions requires one or more input files")
+            } else if args["infer-options"] != nil {
+                throw FormatError.options("--infer-options requires one or more input files")
             } else {
                 printHelp(as: .info)
             }
@@ -819,11 +910,11 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
             return .error
         }
         if outputFlags.filesChecked == 0, outputFlags.filesSkipped == 0 {
-            let inputPaths = inputURLs.map(\.path).joined(separator: ", ")
+            let inputPaths = inputURLs.map(\.path).formattedList(lastSeparator: "or")
             print("warning: No eligible files found at \(inputPaths).", as: .warning)
         }
         if let reporterOutput = try reporter.write() {
-            if let reportURL = reportURL {
+            if let reportURL {
                 print("Writing report file to \(reportURL.path)", as: .info)
                 try reporterOutput.write(to: reportURL, options: .atomic)
             } else {
@@ -835,11 +926,11 @@ func processArguments(_ args: [String], environment: [String: String] = [:], in 
     } catch {
         _ = printWarnings(errors)
         // Fatal error
-        var errorMessage = "\(error)"
-        if ![".", "?", "!"].contains(errorMessage.last ?? " ") {
-            errorMessage += "."
+        var message = "\(error)"
+        if ![".", "?", "!"].contains(message.last ?? " ") {
+            message += "."
         }
-        print("error: \(errorMessage)", as: .error)
+        print("error: \(message)", as: .error)
         return .error
     }
 }
@@ -869,7 +960,7 @@ func parseScriptInput(from environment: [String: String]) throws -> [URL] {
           let count = Int(countString)
     else {
         throw FormatError
-            .options("--scriptinput requires a configured SCRIPT_INPUT_FILE_COUNT integer variable")
+            .options("--script-input requires a configured SCRIPT_INPUT_FILE_COUNT integer variable")
     }
 
     return try (0 ..< count).map { index in
@@ -901,23 +992,24 @@ func printResult(_ dryrun: Bool, _ lint: Bool, _ lenient: Bool, _ strict: Bool, 
 
 func inferOptions(from inputURLs: [URL], options: FileOptions) -> (Int, FormatOptions, [Error]) {
     var tokens = [Token]()
-    var errors = [Error]()
     var filesParsed = 0
+    var options = options
+    // Avoid trying to tokenize markdown files
+    // TODO: need a more robust solution
+    options.supportedFileExtensions.removeAll(where: { $0 == "md" })
     let baseOptions = Options(fileOptions: options)
-    for inputURL in inputURLs {
-        errors += enumerateFiles(
-            withInputURL: inputURL,
-            options: baseOptions,
-            logger: { print($0, as: .info) }
-        ) { inputURL, _, _ in
-            guard let input = try? String(contentsOf: inputURL) else {
-                throw FormatError.reading("Failed to read file \(inputURL.path)")
-            }
-            let _tokens = tokenize(input)
-            return {
-                filesParsed += 1
-                tokens += _tokens
-            }
+    let errors = enumerateFiles(
+        withInputURLs: inputURLs,
+        options: baseOptions,
+        logger: { print($0, as: .info) }
+    ) { inputURL, _, _ in
+        guard let input = try? String(contentsOf: inputURL) else {
+            throw FormatError.reading("Failed to read file \(inputURL.path)")
+        }
+        let _tokens = tokenize(input)
+        return {
+            filesParsed += 1
+            tokens += _tokens
         }
     }
     return (filesParsed, inferFormatOptions(from: tokens), errors)
@@ -933,11 +1025,11 @@ func computeHash(_ source: String) -> String {
     return "\(count)\(hash)"
 }
 
-func applyRules(_ source: String, options: Options, lineRange: ClosedRange<Int>?,
+func applyRules(_ source: String, tokens: [Token]? = nil, options: Options, lineRange: ClosedRange<Int>?,
                 verbose: Bool, lint: Bool, reporter: Reporter?) throws -> [Token]
 {
     // Parse source
-    var tokens = tokenize(source)
+    var tokens = tokens ?? tokenize(source)
 
     // Get rules
     let rulesByName = FormatRules.byName
@@ -970,7 +1062,7 @@ func applyRules(_ source: String, options: Options, lineRange: ClosedRange<Int>?
         if rulesApplied.isEmpty || updatedSource == source {
             print("-- no changes", as: .success)
         } else {
-            let sortedNames = Array(rulesApplied).sorted().joined(separator: ", ")
+            let sortedNames = Array(rulesApplied).sorted().formattedList(lastSeparator: "and")
             print("-- rules applied: \(sortedNames)", as: .success)
         }
     }
@@ -994,7 +1086,7 @@ func processInput(_ inputURLs: [URL],
     // Load cache
     let cacheDirectory = cacheURL?.deletingLastPathComponent().absoluteURL
     var cache: [String: String]?
-    if let cacheURL = cacheURL {
+    if let cacheURL {
         if let data = try? Data(contentsOf: cacheURL) {
             cache = try? JSONDecoder().decode([String: String].self, from: data)
         }
@@ -1024,7 +1116,7 @@ func processInput(_ inputURLs: [URL],
         }
         let formatOptions = options.formatOptions ?? .default
         if formatOptions.swiftVersion == .undefined {
-            print("warning: No Swift version was specified, so some formatting features were disabled. Specify the version of Swift you are using with the --swiftversion option, or by adding a \(swiftVersionFile) file to your project.", as: .warning)
+            print("warning: No Swift version was specified, so some formatting features were disabled. Specify the version of Swift you are using with the --swift-version option, or by adding a \(swiftVersionFile) file to your project.", as: .warning)
         }
         if formatOptions.useTabs, formatOptions.tabWidth <= 0, !formatOptions.smartTabs {
             print("warning: The --smarttabs option is disabled, but no --tabwidth was specified.", as: .warning)
@@ -1032,129 +1124,209 @@ func processInput(_ inputURLs: [URL],
         showedConfigurationWarnings = true
     }
     // Format files
-    var errors = [Error]()
-    for inputURL in inputURLs {
-        errors += enumerateFiles(
-            withInputURL: inputURL,
-            outputURL: outputURL,
-            options: options,
-            concurrent: !verbose,
-            logger: { print($0, as: .info) },
-            skipped: skippedHandler
-        ) { inputURL, outputURL, options in
-            guard let input = try? String(contentsOf: inputURL) else {
-                throw FormatError.reading("Failed to read file \(inputURL.path)")
+    var errors = enumerateFiles(
+        withInputURLs: inputURLs,
+        outputURL: outputURL,
+        options: options,
+        concurrent: !verbose,
+        logger: { print($0, as: .info) },
+        skipped: skippedHandler
+    ) { inputURL, outputURL, options in
+        guard let input = try? String(contentsOf: inputURL) else {
+            throw FormatError.reading("Failed to read file \(inputURL.path)")
+        }
+        // Override options
+        var options = options
+        try options.addArguments(overrides, in: "") // No need for directory as overrides are formatOptions only
+        try options.addFilterArguments(path: inputURL.path)
+        let formatOptions = options.formatOptions ?? .default
+        let range = lineRange.map { "\($0.lowerBound),\($0.upperBound);" } ?? ""
+        // Check cache
+        let rules = options.rules ?? defaultRules
+        let configHash = computeHash("\(formatOptions)\(range)\(rules.sorted().joined(separator: ","))")
+        let cachePrefix = "\(version);\(configHash);"
+        let cacheKey: String = {
+            var path = inputURL.absoluteURL.path
+            if let cacheDirectory {
+                let commonPrefix = path.commonPrefix(with: cacheDirectory.path)
+                path = String(path[commonPrefix.endIndex ..< path.endIndex])
             }
-            // Override options
-            var options = options
-            try options.addArguments(overrides, in: "") // No need for directory as overrides are formatOptions only
-            let formatOptions = options.formatOptions ?? .default
-            let range = lineRange.map { "\($0.lowerBound),\($0.upperBound);" } ?? ""
-            // Check cache
-            let rules = options.rules ?? defaultRules
-            let configHash = computeHash("\(formatOptions)\(range)\(rules.sorted().joined(separator: ","))")
-            let cachePrefix = "\(version);\(configHash);"
-            let cacheKey: String = {
-                var path = inputURL.absoluteURL.path
-                if let cacheDirectory = cacheDirectory {
-                    let commonPrefix = path.commonPrefix(with: cacheDirectory.path)
-                    path = String(path[commonPrefix.endIndex ..< path.endIndex])
+            return path
+        }()
+        do {
+            var cacheHash: String?
+            var sourceHash: String?
+            if let cacheEntry = cache?[cacheKey], cacheEntry.hasPrefix(cachePrefix) {
+                cacheHash = String(cacheEntry[cachePrefix.endIndex...])
+                sourceHash = computeHash(input)
+            }
+            let output: String
+            if let cacheHash, cacheHash == sourceHash {
+                output = input
+                if verbose {
+                    print("\(lint ? "Linting" : "Formatting") \(inputURL.path)", as: .info)
+                    print("-- no changes (cached)", as: .success)
                 }
-                return path
-            }()
-            do {
-                var cacheHash: String?
-                var sourceHash: String?
-                if let cacheEntry = cache?[cacheKey], cacheEntry.hasPrefix(cachePrefix) {
-                    cacheHash = String(cacheEntry[cachePrefix.endIndex...])
-                    sourceHash = computeHash(input)
-                }
-                let output: String
-                if let cacheHash = cacheHash, cacheHash == sourceHash {
-                    output = input
-                    if verbose {
-                        print("\(lint ? "Linting" : "Formatting") \(inputURL.path)", as: .info)
-                        print("-- no changes (cached)", as: .success)
+            } else if inputURL.pathExtension == "md" {
+                var markdown = input
+                let swiftCodeBlocks: [MarkdownCodeBlock]
+                do {
+                    swiftCodeBlocks = try parseCodeBlocks(fromMarkdown: input, language: "swift")
+                } catch {
+                    switch (options.formatOptions ?? .default).markdownFiles {
+                    case .strict:
+                        throw error
+                    case .lenient, .ignore:
+                        swiftCodeBlocks = []
                     }
-                } else {
-                    let outputTokens = try applyRules(input, options: options, lineRange: lineRange,
+                }
+
+                // Iterate backwards through the code blocks to not invalidate existing indices
+                for swiftCodeBlock in swiftCodeBlocks.reversed() {
+                    // Determine the options to use when formatting this block
+                    var options = options
+                    if swiftCodeBlock.options?.contains("no-format") == true {
+                        continue
+                    } else if let args = swiftCodeBlock.options?.components(separatedBy: " "), !args.isEmpty {
+                        let arguments = try preprocessArguments(args, commandLineArguments)
+                        try applyArguments(arguments, lint: lint, to: &options)
+                    }
+
+                    // Set fragment mode
+                    var formatOptions = options.formatOptions ?? .default
+                    if formatOptions.markdownFiles == .ignore {
+                        continue
+                    }
+                    formatOptions.fragment = true
+                    options.formatOptions = formatOptions
+
+                    // Update linebreak line numbers to reflect the actual line in the markdown file
+                    // rather than only the line within the code block. This makes it easier to
+                    // understand printed diagnostics that include line numbers.
+                    let inputTokens = tokenize(swiftCodeBlock.text).map { token in
+                        if case let .linebreak(string, lineInCodeBlock) = token {
+                            return Token.linebreak(string, lineInCodeBlock + swiftCodeBlock.lineStartIndex)
+                        } else {
+                            return token
+                        }
+                    }
+
+                    var outputTokens: [Token]?
+                    let parsingError = parsingError(for: inputTokens, options: formatOptions,
+                                                    allowErrorsInFragments: false)
+
+                    switch formatOptions.markdownFiles {
+                    case .lenient, .ignore:
+                        // Ignore code blocks that fail to parse
+                        if parsingError == nil {
+                            outputTokens = try? applyRules(swiftCodeBlock.text, tokens: inputTokens,
+                                                           options: options, lineRange: lineRange,
+                                                           verbose: verbose, lint: lint, reporter: reporter)
+                        }
+                    case .strict:
+                        if let parsingError {
+                            throw parsingError
+                        }
+
+                        outputTokens = try applyRules(swiftCodeBlock.text, tokens: inputTokens,
+                                                      options: options, lineRange: lineRange,
                                                       verbose: verbose, lint: lint, reporter: reporter)
-                    output = sourceCode(for: outputTokens)
-                    if output != input {
-                        sourceHash = nil
+                    }
+
+                    if let outputTokens {
+                        assert(markdown[swiftCodeBlock.range] == swiftCodeBlock.text)
+                        markdown.replaceSubrange(swiftCodeBlock.range, with: sourceCode(for: outputTokens))
                     }
                 }
-                let cacheValue = cache.map { _ in
-                    // Only bother computing this if cache is enabled
-                    cachePrefix + (sourceHash ?? computeHash(output))
+
+                output = markdown
+                if markdown != input {
+                    sourceHash = nil
                 }
-                if outputURL.path.components(separatedBy: "/").contains("stdout") {
-                    if !dryrun {
-                        // Write to stdout
-                        print(output, as: .raw)
-                        return {
-                            outputFlags.filesChecked += 1
-                            outputFlags.filesFailed += 1
-                            outputFlags.filesWritten += 1
-                            showConfigurationWarnings(options)
-                        }
-                    }
-                } else if outputURL != inputURL, (try? String(contentsOf: outputURL)) != output {
-                    if !dryrun {
-                        do {
-                            try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(),
-                                                                    withIntermediateDirectories: true,
-                                                                    attributes: nil)
-                        } catch {
-                            throw FormatError.writing("Failed to create directory at \(outputURL.path), \(error)")
-                        }
-                    }
-                } else if output == input {
-                    // No changes needed
-                    return {
-                        outputFlags.filesChecked += 1
-                        cache?[cacheKey] = cacheValue
-                        showConfigurationWarnings(options)
-                    }
+            } else {
+                // Regular swift file
+                let outputTokens = try applyRules(input, options: options, lineRange: lineRange,
+                                                  verbose: verbose, lint: lint, reporter: reporter)
+                output = sourceCode(for: outputTokens)
+                if output != input {
+                    sourceHash = nil
                 }
-                if dryrun {
-                    return {
-                        outputFlags.filesChecked += 1
-                        outputFlags.filesFailed += 1
-                        showConfigurationWarnings(options)
-                    }
-                } else {
-                    if verbose {
-                        print("Writing \(outputURL.path)", as: .info)
-                    }
-                    try write(output, to: outputURL)
+            }
+            let cacheValue = cache.map { _ in
+                // Only bother computing this if cache is enabled
+                cachePrefix + (sourceHash ?? computeHash(output))
+            }
+            if outputURL.path.components(separatedBy: "/").contains("stdout") {
+                if !dryrun {
+                    // Write to stdout
+                    print(output, as: .raw)
                     return {
                         outputFlags.filesChecked += 1
                         outputFlags.filesFailed += 1
                         outputFlags.filesWritten += 1
-                        cache?[cacheKey] = cacheValue
                         showConfigurationWarnings(options)
                     }
                 }
-            } catch {
-                if verbose {
-                    var errorMessage = "\(error)"
-                    if !".?!".contains(errorMessage.last ?? " ") {
-                        errorMessage += "."
+            } else if outputURL != inputURL, (try? String(contentsOf: outputURL)) != output {
+                if !dryrun {
+                    do {
+                        try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(),
+                                                                withIntermediateDirectories: true,
+                                                                attributes: nil)
+                    } catch {
+                        throw FormatError.writing("Failed to create directory at \(outputURL.path), \(error)")
                     }
-                    print("-- error: \(errorMessage)", as: .error)
                 }
+            } else if output == input {
+                // No changes needed
                 return {
                     outputFlags.filesChecked += 1
+                    cache?[cacheKey] = cacheValue
                     showConfigurationWarnings(options)
-                    switch error {
-                    case let FormatError.parsing(string):
-                        throw FormatError.parsing("\(string) in \(inputURL.path)")
-                    case let FormatError.writing(string):
-                        throw FormatError.writing("\(string) in \(inputURL.path)")
-                    default:
-                        throw error
+                }
+            }
+            if dryrun {
+                return {
+                    outputFlags.filesChecked += 1
+                    outputFlags.filesFailed += 1
+                    showConfigurationWarnings(options)
+                }
+            } else {
+                if verbose {
+                    print("Writing \(outputURL.path)", as: .info)
+                }
+                try write(output, to: outputURL)
+                return {
+                    outputFlags.filesChecked += 1
+                    outputFlags.filesFailed += 1
+                    outputFlags.filesWritten += 1
+                    cache?[cacheKey] = cacheValue
+                    showConfigurationWarnings(options)
+                }
+            }
+        } catch {
+            if verbose {
+                var message = "\(error)"
+                if !".?!".contains(message.last ?? " ") {
+                    message += "."
+                }
+                print("-- error: \(message)", as: .error)
+            }
+            return {
+                outputFlags.filesChecked += 1
+                showConfigurationWarnings(options)
+                switch error {
+                case let FormatError.parsing(message):
+                    if let range = message.range(of: ". Valid options") ?? message.range(of: ". Did you mean") {
+                        throw FormatError.parsing("""
+                        \(message[..<range.lowerBound]) in \(inputURL.path)\(message[range.lowerBound...])
+                        """)
                     }
+                    throw FormatError.parsing("\(message) in \(inputURL.path)")
+                case let FormatError.writing(message):
+                    throw FormatError.writing("\(message) in \(inputURL.path)")
+                default:
+                    throw error
                 }
             }
         }
@@ -1179,9 +1351,7 @@ func processInput(_ inputURLs: [URL],
         }
     }
     // Save cache
-    if outputFlags.filesChecked > 0, let cache = cache, let cacheURL = cacheURL,
-       let cacheDirectory = cacheDirectory
-    {
+    if outputFlags.filesChecked > 0, let cache, let cacheURL, let cacheDirectory {
         do {
             let data = try JSONEncoder().encode(cache)
             try data.write(to: cacheURL, options: .atomic)
@@ -1196,7 +1366,7 @@ func processInput(_ inputURLs: [URL],
     return (outputFlags, errors)
 }
 
-/// The data format used with `--outputtokens`
+/// The data format used with `--output-tokens`
 private struct OutputTokensData: Encodable {
     init(tokens: [Token]) {
         self.tokens = tokens
@@ -1218,4 +1388,97 @@ private struct OutputTokensData: Encodable {
         let encodedData = try encoder.encode(outputData)
         return String(data: encodedData, encoding: .utf8)!
     }
+}
+
+/// A code block from a markdown file
+///
+/// For example:
+///
+/// ```{language} {{options like `no-format`, `--disable ruleName` can be put here}}
+/// // This content is returned as text,
+/// // and its range in the markdown string is returned as range.
+/// ```
+struct MarkdownCodeBlock {
+    let language: String
+    let range: Range<String.Index>
+    let text: String
+    let options: String?
+    let lineStartIndex: Int
+}
+
+/// Parses code blocks of a specific language in the given markdown file.
+///
+/// Any text following the open delimiter on that initial line is returned in `options`.
+///
+/// For example:
+///
+/// ```{language} {{options like `no-format`, `--disable ruleName` can be put here}}
+/// // This content is returned as text,
+/// // and its range in the markdown string is returned as range.
+/// ```
+func parseCodeBlocks(fromMarkdown markdown: String, language: String) throws -> [MarkdownCodeBlock] {
+    struct PartialCodeBlock {
+        let lineStartIndex: Int
+        let topLevel: Bool
+        let tickCount: Int
+        let textAfterTicks: String
+    }
+
+    let lines = markdown.lineRanges
+    var codeBlocks: [MarkdownCodeBlock] = []
+    var codeBlockStack = [PartialCodeBlock]()
+
+    for (lineIndex, lineRange) in lines.enumerated() {
+        let lineText = markdown[lineRange].trimmingCharacters(in: .whitespacesAndNewlines)
+        let ticks = String(lineText.prefix(while: { $0 == "`" }))
+        let tickCount = ticks.count
+        guard tickCount >= 3 else { continue }
+
+        let textAfterTicks = String(lineText.dropFirst(tickCount))
+
+        // If this fence has a different number of ticks from the previous fence,
+        // or has text like ```language, then it's an open fence.
+        let isOpenFence = !textAfterTicks.isEmpty
+            || codeBlockStack.last?.tickCount != tickCount
+
+        if isOpenFence {
+            codeBlockStack.append(PartialCodeBlock(
+                lineStartIndex: lineIndex + 1,
+                topLevel: codeBlockStack.isEmpty,
+                tickCount: tickCount,
+                textAfterTicks: textAfterTicks
+            ))
+        }
+
+        else if let partialBlock = codeBlockStack.popLast() {
+            // Only store and return blocks that are top-level and match the given language
+            guard partialBlock.topLevel,
+                  partialBlock.textAfterTicks.hasPrefix(language),
+                  lineIndex != partialBlock.lineStartIndex
+            else { continue }
+
+            let options = String(partialBlock.textAfterTicks.dropFirst(language.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let codeEnd = lines[lineIndex - 1].upperBound
+            let range = lines[partialBlock.lineStartIndex].lowerBound ..< codeEnd
+            let codeText = String(markdown[range])
+            assert(markdown[range] == codeText)
+
+            codeBlocks.append(MarkdownCodeBlock(
+                language: language,
+                range: range,
+                text: codeText,
+                options: options.isEmpty ? nil : options,
+                lineStartIndex: partialBlock.lineStartIndex
+            ))
+        }
+    }
+
+    // Check for unbalanced code blocks
+    if !codeBlockStack.isEmpty {
+        throw FormatError.parsing("Unbalanced code block delimiters in markdown")
+    }
+
+    return codeBlocks
 }

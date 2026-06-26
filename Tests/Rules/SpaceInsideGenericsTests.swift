@@ -9,10 +9,14 @@
 import XCTest
 @testable import SwiftFormat
 
-class SpaceInsideGenericsTests: XCTestCase {
+final class SpaceInsideGenericsTests: XCTestCase {
     func testSpaceInsideGenerics() {
-        let input = "Foo< Bar< Baz > >"
-        let output = "Foo<Bar<Baz>>"
+        let input = """
+        Foo< Bar< Baz > >
+        """
+        let output = """
+        Foo<Bar<Baz>>
+        """
         testFormatting(for: input, output, rule: .spaceInsideGenerics)
     }
 }

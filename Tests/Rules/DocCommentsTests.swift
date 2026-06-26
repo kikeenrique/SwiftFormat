@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class DocCommentsTests: XCTestCase {
+final class DocCommentsTests: XCTestCase {
     func testConvertCommentsToDocComments() {
         let input = """
         // Multi-line comment before class with
@@ -115,6 +115,11 @@ class DocCommentsTests: XCTestCase {
                 /// an entire following block of code (not just the property)
                 let bar: Bar? = Bar()
                 print(bar)
+
+                #if DEBUG
+                    /// This comment is in a conditional compilation block
+                    let baaz = Baaz()
+                #endif
             }
 
             var baaz: Baaz {
@@ -150,6 +155,11 @@ class DocCommentsTests: XCTestCase {
                 // an entire following block of code (not just the property)
                 let bar: Bar? = Bar()
                 print(bar)
+
+                #if DEBUG
+                    // This comment is in a conditional compilation block
+                    let baaz = Baaz()
+                #endif
             }
 
             var baaz: Baaz {
@@ -169,7 +179,7 @@ class DocCommentsTests: XCTestCase {
         """
 
         testFormatting(for: input, output, rule: .docComments,
-                       exclude: [.spaceInsideComments, .redundantProperty, .propertyTypes])
+                       exclude: [.spaceInsideComments, .redundantVariable, .propertyTypes])
     }
 
     func testPreservesDocComments() {
@@ -246,7 +256,7 @@ class DocCommentsTests: XCTestCase {
         """
 
         let options = FormatOptions(preserveDocComments: true)
-        testFormatting(for: input, output, rule: .docComments, options: options, exclude: [.spaceInsideComments, .redundantProperty, .propertyTypes])
+        testFormatting(for: input, output, rule: .docComments, options: options, exclude: [.spaceInsideComments, .redundantVariable, .propertyTypes])
     }
 
     func testDoesntConvertCommentBeforeConsecutivePropertiesToDocComment() {
@@ -549,7 +559,7 @@ class DocCommentsTests: XCTestCase {
             func returnNumber() { 3 }
         #endif
         """
-        testFormatting(for: input, output, rule: .docComments)
+        testFormatting(for: input, output, rule: .docComments, exclude: [.wrapFunctionBodies])
     }
 
     func testDocCommentInsideIfdefElse() {
@@ -563,7 +573,7 @@ class DocCommentsTests: XCTestCase {
             func returnNumber() { 3 }
         #endif
         """
-        testFormatting(for: input, rule: .docComments)
+        testFormatting(for: input, rule: .docComments, exclude: [.wrapFunctionBodies])
     }
 
     func testDocCommentForMacro() {
@@ -575,5 +585,134 @@ class DocCommentsTests: XCTestCase {
         ) = #externalMacro(module: "StaticLoggerMacros", type: "StaticLogger")
         """
         testFormatting(for: input, rule: .docComments)
+    }
+
+    func testCommentsTrailingDeclarationPreservedAsRegularComment() {
+        let input = """
+        // Comment
+        let foo: Foo // Foo
+        let bar: Bar // Bar
+        """
+
+        testFormatting(for: input, rule: .docComments)
+    }
+
+    func testDocCommentsTrailingDeclarationConvertedToRegularComment() {
+        let input = """
+        // Comment
+        let foo: Foo /// Foo
+        let foo: bar /// Bar
+
+        """
+
+        let output = """
+        // Comment
+        let foo: Foo // Foo
+        let foo: bar // Bar
+
+        """
+
+        testFormatting(for: input, output, rule: .docComments)
+    }
+
+    func testDocCommentsAfterSwitchCase() {
+        let input = """
+        func foo() {
+            switch bar {
+            case .foo:
+                break
+            default:
+                break
+            }
+        }
+
+        /// Baz
+        func baz() {}
+        """
+
+        testFormatting(for: input, rule: .docComments)
+    }
+
+    func testDocCommentsAfterConditionalSwitchCase() {
+        let input = """
+        func foo() {
+            switch bar {
+            #if DEBUG
+                case .foo:
+                    break
+            #endif
+            default:
+                break
+            }
+        }
+
+        /// Baz
+        func baz() {}
+        """
+
+        testFormatting(for: input, rule: .docComments)
+    }
+
+    func testPreserveDocCommentContinuousWithMarkComment() {
+        let input = """
+        // MARK: - PlaceholderFlowOrigin
+        /// Placeholder text describing a sample flow origin.
+        public enum PlaceholderFlowOrigin {
+            case standard(ScreenAuthenticationType)
+            case premium(sampleType: ScreenAuthenticationType?)
+        }
+        """
+
+        testFormatting(for: input, rule: .docComments, exclude: [.blankLinesAroundMark])
+    }
+
+    func testPreserveDocCommentAfterSwiftFormatDirective() {
+        let input = """
+        // swiftformat:enable docComments
+        /// Placeholder text describing a sample flow origin.
+        public enum PlaceholderFlowOrigin {
+            case standard(ScreenAuthenticationType)
+            case premium(sampleType: ScreenAuthenticationType?)
+        }
+        """
+
+        testFormatting(for: input, rule: .docComments)
+    }
+
+    func testPreserveDocCommentBeforeSwiftFormatDirective() {
+        let input = """
+        /// Placeholder text describing a sample flow origin.
+        // swiftformat:enable:next docComments
+        public enum PlaceholderFlowOrigin {
+            case standard(ScreenAuthenticationType)
+            case premium(sampleType: ScreenAuthenticationType?)
+        }
+        """
+
+        testFormatting(for: input, rule: .docComments)
+    }
+
+    func testDocCommentOnNestedFunction() {
+        let input = """
+        // Parent function at file scope
+        func parentFunction() {
+            // Nested function inside parent function
+            func nestedFunction() {
+                print("foo bar")
+            }
+        }
+        """
+
+        let output = """
+        /// Parent function at file scope
+        func parentFunction() {
+            /// Nested function inside parent function
+            func nestedFunction() {
+                print("foo bar")
+            }
+        }
+        """
+
+        testFormatting(for: input, output, rule: .docComments)
     }
 }

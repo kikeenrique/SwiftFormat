@@ -3,7 +3,7 @@
 [![PayPal](https://img.shields.io/badge/paypal-donate-blue.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=9ZGWNK5FEZFF6&source=url)
 [![Build](https://github.com/nicklockwood/SwiftFormat/actions/workflows/build.yml/badge.svg)](https://github.com/nicklockwood/SwiftFormat/actions/workflows/build.yml)
 [![Codecov](https://codecov.io/gh/nicklockwood/SwiftFormat/graphs/badge.svg)](https://codecov.io/gh/nicklockwood/SwiftFormat)
-[![Swift 5.3](https://img.shields.io/badge/swift-5.1-red.svg?style=flat)](https://developer.apple.com/swift)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fnicklockwood%2FSwiftFormat%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/nicklockwood/swiftformat)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)](https://opensource.org/licenses/MIT)
 [![Mastodon](https://img.shields.io/badge/mastodon-@nicklockwood@mastodon.social-636dff.svg)](https://mastodon.social/@nicklockwood)
 
@@ -37,6 +37,7 @@ Table of Contents
     - [Error codes](#error-codes)
     - [Cache](#cache)
     - [File headers](#file-headers)
+    - [Markdown formatting](#markdown-formatting)
 - [FAQ](#faq)
 - [Known issues](#known-issues)
 - [Tip Jar](#tip-jar)
@@ -95,6 +96,53 @@ Alternatively, you can install the tool on macOS or Linux by using [Mint](https:
 $ mint install nicklockwood/SwiftFormat
 ```
 
+If you use Nix, you can add SwiftFormat to a `devShell` using `nixpkgs`:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  };
+
+  outputs = { nixpkgs, ... }:
+    let
+      system = "aarch64-darwin";
+      pkgs = import nixpkgs { inherit system; };
+    in {
+      devShells.${system}.default = pkgs.mkShell {
+        packages = [
+          pkgs.swiftformat
+        ];
+      };
+    };
+}
+```
+
+If you need to pin SwiftFormat to a specific version in your `devShell`, you can use [`acevif/swiftformat-nix`](https://github.com/acevif/swiftformat-nix):
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    swiftformat-nix.url = "github:acevif/swiftformat-nix";
+  };
+
+  outputs = { nixpkgs, swiftformat-nix, ... }:
+    let
+      system = "aarch64-darwin";
+      pkgs = import nixpkgs { inherit system; };
+    in {
+      devShells.${system}.default = pkgs.mkShell {
+        packages = [
+          swiftformat-nix.packages.${system}.swiftformat_0_58_7
+        ];
+      };
+    };
+}
+```
+
+Replace `aarch64-darwin` with your system, and replace `swiftformat_0_58_7` with the version you want to install.
+
 Or if you prefer, you can check out and build SwiftFormat manually on macOS, Linux or Windows as follows:
 
 ```bash
@@ -145,13 +193,13 @@ To use it safely, do the following:
 
 2. Make sure that you have committed all your changes to that code safely in git (or whatever source control system you use).
 
-3. (Optional) In Terminal, type `swiftformat --inferoptions "/path/to/your/code/"`. This will suggest a set of formatting options to use that match your existing project style (but you are free to ignore these and use the defaults, or your own settings if you prefer).
+3. (Optional) In Terminal, type `swiftformat --infer-options "/path/to/your/code/"`. This will suggest a set of formatting options to use that match your existing project style (but you are free to ignore these and use the defaults, or your own settings if you prefer).
 
     The path can point to either a single Swift file or a directory of files. It can be either be absolute, or relative to the current directory. The `""` quotes around the path are optional, but if the path contains spaces then you either need to use quotes, or escape each space with `\`. You may include multiple paths separated by spaces.
 
 4. In Terminal, type `swiftformat "/path/to/your/code/"`. The same rules apply as above with respect to paths, and multiple space-delimited paths are allowed.
 
-    If you used `--inferoptions` to generate a suggested set of options in step 3, you should copy and paste them into the command, either before or after the path(s) to your source files.
+    If you used `--infer-options` to generate a suggested set of options in step 3, you should copy and paste them into the command, either before or after the path(s) to your source files.
 
     If you have created a [config file](#config-file), you can specify its path using `--config "/path/to/your/config-file/"`. Alternatively, if you name the file `.swiftformat` and place it inside the project you are formatting, it will be picked up automatically.
 
@@ -187,7 +235,7 @@ If you do not supply an input file, SwiftFormat will automatically take its inpu
 $ cat /path/to/file.swift | swiftformat stdin
 ```
 
-When using stdin, SwiftFormat does not have access to the file path of the input, so features that rely on the file location (such as inserting the creation date into header comments, or detecting `.swiftformat` configuration files in the file path) will not work. To solve this, you can provide the file path using the `--stdinpath` argument:
+When using stdin, SwiftFormat does not have access to the file path of the input, so features that rely on the file location (such as inserting the creation date into header comments, or detecting `.swiftformat` configuration files in the file path) will not work. To solve this, you can provide the file path using the `--stdin-path` argument:
 
 ```bash
 $ cat /path/to/file.swift | swiftformat stdin --stdinpath /path/to/file.swift
@@ -251,7 +299,7 @@ let package = Package(
     name: "BuildTools",
     platforms: [.macOS(.v10_11)],
     dependencies: [
-        .package(url: "https://github.com/nicklockwood/SwiftFormat", from: "0.55.0"),
+        .package(url: "https://github.com/nicklockwood/SwiftFormat", from: "0.61.1"),
     ],
     targets: [.target(name: "BuildTools", path: "")]
 )
@@ -285,7 +333,7 @@ You can also use `swift run -c release --package-path BuildTools swiftformat "$S
 1. Add the `swiftformat` binary to your project directory via [CocoaPods](https://cocoapods.org/), by adding the following line to your Podfile then running `pod install`:
 
     ```ruby
-    pod 'SwiftFormat/CLI', '~> 0.55'
+    pod 'SwiftFormat/CLI', '~> 0.61.1'
     ```
 
 **NOTE:** This will only install the pre-built command-line app, not the source code for the SwiftFormat framework.
@@ -353,7 +401,7 @@ You can use `SwiftFormat` as a SwiftPM command plugin.
 ```swift
 dependencies: [
     // ...
-    .package(url: "https://github.com/nicklockwood/SwiftFormat", from: "0.55.0"),
+    .package(url: "https://github.com/nicklockwood/SwiftFormat", from: "0.61.1"),
 ]
 ```
 
@@ -367,12 +415,12 @@ swift package plugin --allow-writing-to-package-directory swiftformat
 
 You can limit the formatting to a particular target with `--target` option.
 
-You can also specify `SwiftFormat` arguments, e.g. `--swiftversion`.
+You can also specify `SwiftFormat` arguments, e.g. `--swift-version`.
 
 Example
 
 ```bash
-swift package plugin --allow-writing-to-package-directory swiftformat --target MyLibrary --swiftversion 5.6 --verbose
+swift package plugin --allow-writing-to-package-directory swiftformat --target MyLibrary --swift-version 5.6 --verbose
 ```
 
 ### Trigger Plugin From Xcode
@@ -381,7 +429,7 @@ In Xcode 14 you can trigger the command plugin execution for a Swift package or 
 
 For an Xcode project the project's main directory will be processed and the `--target` option will be ignored.
 
-You can also specify `SwiftFormat` arguments, e.g. `--swiftversion`.
+You can also specify `SwiftFormat` arguments, e.g. `--swift-version`.
 
 ![Run plugin in Xcode 14](https://user-images.githubusercontent.com/4176826/179352584-db7f7f42-452c-4a42-a329-01b115a237a7.gif)
 
@@ -401,10 +449,29 @@ end tell
 Some Apps you can trigger this from are [BetterTouchTool](https://folivora.ai), [Alfred](https://www.alfredapp.com) or [Keyboard Maestro](https://www.keyboardmaestro.com/main/). Another option is to define a QuickAction for Xcode via Automator and then assign a keyboard shortcut for it in the System Preferences.
 
 
-VSCode plugin
---------------
+VSCode integration
+-------------------
 
-If you prefer to use Microsoft's [VSCode](https://code.visualstudio.com) editor for writing Swift, [Valentin Knabel](https://github.com/vknabel) has created a [VSCode plugin](https://marketplace.visualstudio.com/items?itemName=vknabel.vscode-swiftformat) for SwiftFormat.
+If you prefer to use Microsoft's [VSCode](https://code.visualstudio.com) editor for writing Swift, SwiftFormat can be integrated using the [Run on Save](https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave) extension:
+
+1. Install the SwiftFormat command-line tool
+2. Install the VSCode extension: [Run on Save](https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave)
+3. Add the following to your `.vscode/settings.json`:
+
+```json
+{
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.swift$",
+        "cmd": "swiftformat ${file}"
+      }
+    ]
+  }
+}
+```
+
+This will automatically format Swift files on save.
 
 
 Sublime Text plugin
@@ -432,7 +499,7 @@ Git pre-commit hook
 
     ```bash
     #!/bin/bash
-    git-format-staged --formatter "swiftformat stdin --stdinpath '{}'" "*.swift"
+    git-format-staged --formatter "swiftformat stdin --stdin-path '{}'" "*.swift"
     ```
     
     (Note that this example uses your locally installed version of SwiftFormat, not a separate copy in your project repository. You can replace `swiftformat` with the path to a copy inside your project if you prefer.)
@@ -557,7 +624,7 @@ The options available in SwiftFormat can be displayed using the `--options` comm
 
 Rules are configured by adding `--[option_name] [value]` to your command-line arguments, or by creating a `.swiftformat` [config file](#config-file) and placing it in your project directory.
 
-A given option may affect multiple rules. Use `--ruleinfo [rule_name]` command for details about which options affect a given rule, or see the [Rules.md](https://github.com/nicklockwood/SwiftFormat/blob/main/Rules.md) file.
+A given option may affect multiple rules. Use `--rule-info [rule_name]` command for details about which options affect a given rule, or see the [Rules.md](https://github.com/nicklockwood/SwiftFormat/blob/main/Rules.md) file.
 
 You can configure options for specific files or code ranges by using `swiftformat:options` directive in comments inside your Swift file. To temporarily set one or more options inside a source file, use:
 
@@ -565,9 +632,11 @@ You can configure options for specific files or code ranges by using `swiftforma
 // swiftformat:options --indent 2 --allman true
 ```
 
-To apply an options override only to a particular line, use the `:next` modifier:
+To apply an options override only to a particular line, use the `:this`, `:next` or `:previous` modifiers:
 
 ```swift
+let indexUrl: URL // swiftformat:options:this --preserve-acronyms url 
+
 // swiftformat:options:next --semicolons inline
 doTheThing(); print("Did the thing")
 ```
@@ -580,7 +649,7 @@ SwiftFormat includes over 50 rules, and new ones are added all the time. An up-t
 
 The list of available rules can be displayed within the command-line app using the `--rules` argument. Rules can be either enabled or disabled. Most are enabled by default. Disabled rules are marked with "(disabled)" when displayed using `--rules`.
 
-You can use the `--ruleinfo [rule_name]` command to get information about a specific rule. Pass a comma-delimited list of rule names to get information for multiple rules at once, or use `--ruleinfo` with no argument for info on all rules.
+You can use the `--rule-info [rule_name]` command to get information about a specific rule. Pass a comma-delimited list of rule names to get information for multiple rules at once, or use `--rule-info` with no argument for info on all rules.
 
 You can disable rules individually using `--disable` followed by a list of one or more comma-delimited rule names, or enable opt-in rules using `--enable` followed by the rule names:
 
@@ -661,7 +730,7 @@ let foo = bar // rule(s) will be disabled for this line
 let bar = baz // rule(s) will be re-enabled for this line
 ```
 
-There is no need to manually re-enable a rule after using the `next` directive.
+You can also use `this` or `previous` to enable or disable rules for the current or previous line. There is no need to manually re-enable a rule after using the `next`, `this` or `previous` directives.
 
 **NOTE:** The `swiftformat:enable` directive only serves to counter a previous `swiftformat:disable` directive in the same file. It is not possible to use `swiftformat:enable` to enable a rule that was not already enabled when formatting started.
 
@@ -673,20 +742,20 @@ Most SwiftFormat rules are version-agnostic, but some are applicable only to new
 
 You can specify the Swift compiler version in one of two ways:
 
-You can specify your project's Swift compiler version using the `--swiftversion` command line argument. You can also add the `--swiftversion` option to your `.swiftformat` file.
+You can specify your project's Swift compiler version using the `--swift-version` command line argument. You can also add the `--swift-version` option to your `.swiftformat` file.
 
-Another option is to add a `.swift-version` file to your project directory. This is a text file that should contain the minimum Swift version supported by your project, and is also supported by some other tools. The `--swiftversion` argument takes precedence over any `.swift-version` files.
+Another option is to add a `.swift-version` file to your project directory. This is a text file that should contain the minimum Swift version supported by your project, and is also supported by some other tools. Any `.swift-version` files always take precedence over the `--swift-version` argument.
 
-Both the `.swift-version` file and the `--swiftversion` option in a `.swiftformat` file are applied hierarchically; If you have submodules in your project that use a different Swift version, you can add separate swift version configurations for those directories.
+Both the `.swift-version` file and the `--swift-version` option in a `.swiftformat` file are applied hierarchically; If you have submodules in your project that use a different Swift version, you can add separate swift version configurations for those directories.
 
 Swift language mode
 -------------------
 
 SwiftFormat also allows you to specify the Swift _language mode_ used by your project. This is distinct from the Swift compiler version. For example, you can use the Swift 6.0 compiler with either the Swift 5 language mode or the Swift 6 language mode. Some SwiftFormat rules will behave differently under different Swift language modes.
 
-You can specify your project's Swift language mode using the `--languagemode` command line argument. You can also add the `--languagemode` option to your `.swiftformat` file.
+You can specify your project's Swift language mode using the `--language-mode` command line argument. You can also add the `--language-mode` option to your `.swiftformat` file.
 
-If not specified, SwiftFormat uses the default language mode of the specified Swift compiler version. The default language mode in Swift 5.x and Swift 6.x is the Swift 5 language mode. If your project uses the Swift 6 language mode, you should specify `--languagemode 6`.
+If not specified, SwiftFormat uses the default language mode of the specified Swift compiler version. The default language mode in Swift 5.x and Swift 6.x is the Swift 5 language mode. If your project uses the Swift 6 language mode, you should specify `--language-mode 6`.
 
 
 Config file
@@ -728,11 +797,24 @@ The config file format is designed to be edited by hand. You may include blank l
 --disable elseOnSameLine,semicolons
 ```
 
-If you would prefer not to edit the configuration file by hand, you can use the [SwiftFormat for Xcode](#xcode-source-editor-extension) app to edit the configuration and export a configuration file. You can also use the swiftformat command-line-tool's `--inferoptions` command to generate a config file from your existing project, like this:
+You can create multiple configuration sections within a single `.swiftformat` file to apply different formatting options to different parts of your project. Each section should specify a `--filter` glob pattern to determine which files the configuration applies to. Options in that section are used when formatting files that match `--filter` glob, in addition to the base options in the file.
+
+```
+--enable indent
+--indent 4
+
+[Tests]
+--filter **/Tests/**
+--enable noForceUnwrapInTests
+--enable noForceTryInTests
+--indent 2
+```
+
+If you would prefer not to edit the configuration file by hand, you can use the [SwiftFormat for Xcode](#xcode-source-editor-extension) app to edit the configuration and export a configuration file. You can also use the swiftformat command-line-tool's `--infer-options` command to generate a config file from your existing project, like this:
 
 ```bash
 $ cd /path/to/project
-$ swiftformat --inferoptions . --output .swiftformat
+$ swiftformat --infer-options . --output .swiftformat
 ```
 
 Globs
@@ -786,7 +868,7 @@ $ swiftformat --lint path/to/project
 
 This runs the same rules as format mode, and all the same configuration options apply, however, no files will be modified. Instead, SwiftFormat will format each file in memory and then compare the result against the input and report the lines that required changes.
 
-The `--lint` option is similar to `--dryrun`, but `--lint` returns warnings for every line that required changes, and will return a nonzero error code (see [Error codes](#error-codes) below) if any changes are detected, which is useful if you want it to fail a build step on your CI server.
+The `--lint` option is similar to `--dry-run`, but `--lint` returns warnings for every line that required changes, and will return a nonzero error code (see [Error codes](#error-codes) below) if any changes are detected, which is useful if you want it to fail a build step on your CI server.
 
 If you would prefer `--lint` not to fail your build, you can use the `--lenient` option to force SwiftFormat to return success in `--lint` mode even when formatting issues were detected.
 
@@ -802,7 +884,7 @@ Sometimes you may wish to autoformat some rules, but only lint others. To do tha
 
 ```
 --rules braces,indent
---lintonly trailingClosures,unusedArguments
+--lint-only trailingClosures,unusedArguments
 ```
 
 
@@ -821,7 +903,7 @@ Cache
 
 SwiftFormat uses a cache file to avoid reformatting files that haven't changed. For a large project, this can significantly reduce processing time.
 
-By default, the cache is stored in `~/Library/Caches/com.charcoaldesign.swiftformat` on macOS, or `/var/tmp/com.charcoaldesign.swiftformat` on Linux. Use the command-line option `--cache ignore` to ignore the cached version and re-apply formatting to all files. Alternatively, you can use `--cache clear` to delete the cache (or you can just manually delete the cache file).
+By default, the cache is stored in `~/Library/Caches/com.charcoaldesign.swiftformat` on macOS, or `/tmp/com.charcoaldesign.swiftformat` on Linux. Use the command-line option `--cache ignore` to ignore the cached version and re-apply formatting to all files. Alternatively, you can use `--cache clear` to delete the cache (or you can just manually delete the cache file).
 
 The cache is shared between all projects. The file is fairly small, as it only stores the path and size for each file, not the contents. If you do start experiencing slowdown due to the cache growing too large, you might want to consider using a separate cache file for each project.
 
@@ -878,6 +960,77 @@ Will be formatted as:
 **NOTE:** the `{year}` value and `{created}` date format are determined from the current locale and timezone of the machine running the script. `{author.name}` and `{author.email}` requires the project to be version controlled by git.
 
 
+Markdown formatting
+-------------------
+
+SwiftFormat can format Swift code blocks inside Markdown files (`.md`). This is useful for keeping code examples in documentation, README files, and other markdown content properly formatted.
+
+````diff
+  ### Sample README
+  
+  This is a nice project with lots of cool APIs to know about, including:
+  
+  ```swift
+  func foo(
+- bar: Bar,
+- baaz: Baaz
++     bar: Bar,
++     baaz: Baaz
+  ) -> Foo { ... }
+  ```
+````
+
+To format Swift code blocks in markdown files, use the `--markdown-files` option with either `strict` or `lenient`:
+
+```bash
+$ swiftformat . --markdown-files strict
+$ swiftformat . --markdown-files lenient
+```
+
+Or add it to your `.swiftformat` config file:
+
+```
+--markdown-files strict
+```
+
+**Formatting modes:**
+
+SwiftFormat supports two modes for handling markdown files:
+
+- `lenient` (default): Ignores parsing errors in code blocks and continues formatting
+- `strict`: Fails if any code blocks contain parsing errors
+
+SwiftFormat's tokenizer is more permissive than the Swift compiler and typically only emits errors when encountering unbalanced scope tokens like `(` or `{`.
+
+**Code block options:**
+
+You can specify options for options for individual code blocks by adding them after the opening delimiter. For example, you can use `no-format` to prevent a code block from being parsed or formatted:
+
+````md
+```swift no-format
+func example()
+{
+    doSomething()
+}
+```
+````
+
+You can also specify SwiftFormat command line options to configure the behavior of individual rules:
+
+````md
+```swift --indent 2
+func example() {
+  doSomething()
+}
+```
+
+```swift --disable redundantSelf
+func example() {
+    self.doSomething()
+}
+```
+````
+
 FAQ
 -----
 
@@ -898,7 +1051,7 @@ FAQ
 
 *Q. What versions of Swift are supported?*
 
-> A. The SwiftFormat framework and command-line tool can be compiled using Swift 5.3 and above, and can format programs written in Swift 4.x or 5. Swift 3.x is no longer actively supported. If you are still using Swift 3.x or earlier and find that SwiftFormat breaks your code, the best solution is probably to revert to an earlier SwiftFormat release, or enable only a small subset of rules. Use the `--swiftversion` argument to enable additional rules specific to later Swift versions.
+> A. The SwiftFormat framework and command-line tool can be compiled using Swift 5.3 and above, and can format programs written in Swift 4.x or 5. Swift 3.x is no longer actively supported. If you are still using Swift 3.x or earlier and find that SwiftFormat breaks your code, the best solution is probably to revert to an earlier SwiftFormat release, or enable only a small subset of rules. Use the `--swift-version` argument to enable additional rules specific to later Swift versions.
 
 
 *Q. SwiftFormat made changes I didn't want it to. How can I find out which rules to disable?*
@@ -908,12 +1061,12 @@ FAQ
 
 *Q. People on my team have different SwiftFormat versions installed. How can we ensure consistent formatting?
 
-> A. You can specify a `--minversion` argument in your project's .swiftformat` file to fail the build if developers attempt to use an older SwiftFormat version.
+> A. You can specify a `--min-version` argument in your project's .swiftformat` file to fail the build if developers attempt to use an older SwiftFormat version.
 
 
 *Q. How can I modify the formatting rules?*
 
-> A. Many configuration options are exposed in the command-line interface or `.swiftformat` configuration file. You can either set these manually, or use the `--inferoptions` argument to automatically generate the configuration from your existing project.
+> A. Many configuration options are exposed in the command-line interface or `.swiftformat` configuration file. You can either set these manually, or use the `--infer-options` argument to automatically generate the configuration from your existing project.
 
 > If there is a rule that you don't like, and which cannot be configured to your liking via the command-line options, you can disable one or more rules by using the `--disable` argument, followed by the name of the rules, separated by commas. You can display a list of all supported rules using the `--rules` argument, and their behaviors are documented above this section in the README.
 
@@ -959,27 +1112,27 @@ Known issues
 
 * When using the Xcode Source Editor Extension, the SwiftFormat menu sometimes disappears from Xcode. If this happens, try moving or renaming Xcode temporarily and then changing it back. Failing that, the suggestions in [this thread](https://github.com/nicklockwood/SwiftFormat/issues/494) may help.
 
-* The `enumNamespaces` rule replaces classes that have only static members with an `enum`. If the class is subclassed, or if there is code that depends on the class exposing certain runtime behaviors, this may break the program. To solve this you can either fix it on a per-case basis by adding a `// swiftformat:disable:next enumNamespaces` comment directive above the class declaration, or you can add `--enumnamespaces structs-only` to prevent the rule being applied to classes, or you can just disable the `enumNamespaces` rule completely.
+* The `enumNamespaces` rule replaces classes that have only static members with an `enum`. If the class is subclassed, or if there is code that depends on the class exposing certain runtime behaviors, this may break the program. To solve this you can either fix it on a per-case basis by adding a `// swiftformat:disable:next enumNamespaces` comment directive above the class declaration, or you can add `--enum-namespaces structs-only` to prevent the rule being applied to classes, or you can just disable the `enumNamespaces` rule completely.
 
-* The `redundantVoidReturnType` rule can inadvertently alter the type signature for closures, for example in cases where the closure calls a `@discardableResult` function. To solve this you can either fix it on a per-case basis by adding a `// swiftformat:disable:next redundantVoidReturnType` comment directive to disable the rule for a specific call site, or you can add `--closurevoid preserve` to your [configuration](#configuration) to disable the rule completely for closures (regular functions or methods aren't affected).
+* The `redundantVoidReturnType` rule can inadvertently alter the type signature for closures, for example in cases where the closure calls a `@discardableResult` function. To solve this you can either fix it on a per-case basis by adding a `// swiftformat:disable:next redundantVoidReturnType` comment directive to disable the rule for a specific call site, or you can add `--closure-void preserve` to your [configuration](#configuration) to disable the rule completely for closures (regular functions or methods aren't affected).
 
-* The `redundantType` rule can introduce ambiguous code in certain cases when using the default mode of `--redundanttype inferred`. This can be worked around by by using `--redundanttype explicit`, or by manually removing the redundant type reference on the affected line, or by using the `// swiftformat:disable:next redundantType` comment directive to disable the rule at the call site (or just disable the `redundantType` rule completely).
+* The `redundantType` rule can introduce ambiguous code in certain cases when using the default mode of `--redundant-type inferred`. This can be worked around by by using `--redundant-type explicit`, or by manually removing the redundant type reference on the affected line, or by using the `// swiftformat:disable:next redundantType` comment directive to disable the rule at the call site (or just disable the `redundantType` rule completely).
 
-* If a type initializer or factory method returns an implicitly unwrapped optional value then the `redundantType` rule may remove the explicit type in a situation where it's actually required. To work around this you can either use `--redundanttype explicit`, or use the `// swiftformat:disable:next redundantType` comment directive to disable the rule at the call site (or just disable the `redundantType` rule completely).
+* If a type initializer or factory method returns an implicitly unwrapped optional value then the `redundantType` rule may remove the explicit type in a situation where it's actually required. To work around this you can either use `--redundant-type explicit`, or use the `// swiftformat:disable:next redundantType` comment directive to disable the rule at the call site (or just disable the `redundantType` rule completely).
 
 * When using the `initCoderUnavailable` rule, if an `init` that is marked as unavailable is overridden elsewhere in the program then it will cause a compilation error. The recommended workaround is to remove the override (which shouldn't affect the program behavior if the init was really unused) or use the `// swiftformat:disable:next initCoderUnavailable` comment directive to disable the rule for the overridden init (or just disable the `initCoderUnavailable` rule completely).
 
-* When using the `extensionAccessControl` rule with the `--extensionacl on-extension` option, if you have public methods defined on an internal type defined in another file, the resultant public extension will no longer compile. The recommended solution is to manually remove the `public` modifier (this won't change the program behavior) or disable the `extensionAccessControl` rule.
+* When using the `extensionAccessControl` rule with the `--extension-acl on-extension` option, if you have public methods defined on an internal type defined in another file, the resultant public extension will no longer compile. The recommended solution is to manually remove the `public` modifier (this won't change the program behavior) or disable the `extensionAccessControl` rule.
 
 * When using the `preferKeyPath` rule, conversion of `compactMap { $0.foo }` to `compactMap(\.foo)` or `flatMap { $0.foo }` to `flatMap(\.foo)` will result in code that fails to compile if `foo` is not an `Optional` property. This is due to a difference in the way that Swift handles type inference for closures vs keyPaths, as discussed [here](https://bugs.swift.org/browse/SR-13347). The recommended workaround is to replace `compactMap()` or `flatMap()` with `map()` in these cases, which will not change the behavior of the code.
 
-* When using the `--self remove` option, the `redundantSelf` rule will remove references to `self` in autoclosure arguments, which may change the meaning of the code, or cause it not to compile. To work around this issue, use the `--selfrequired` option to provide a comma-delimited list of methods to be excluded from the rule. The `expect()` function from the popular [Nimble](https://github.com/Quick/Nimble) unit testing framework is already excluded by default. If you are using the `--self insert` option then this is not an issue.
+* When using the `--self remove` option, the `redundantSelf` rule will remove references to `self` in autoclosure arguments, which may change the meaning of the code, or cause it not to compile. To work around this issue, use the `--self-required` option to provide a comma-delimited list of methods to be excluded from the rule. The `expect()` function from the popular [Nimble](https://github.com/Quick/Nimble) unit testing framework is already excluded by default. If you are using the `--self insert` option then this is not an issue.
 
 * If you assign `SomeClass.self` to a variable and then instantiate an instance of the class using that variable, Swift requires that you use an explicit `.init()`, however, the `redundantInit` rule is not currently capable of detecting this situation in all cases, and may remove the `.init`. To work around this issue, use the `// swiftformat:disable:next redundantInit` comment directive to disable the rule for any affected lines of code (or just disable the `redundantInit` rule completely).
 
 * The `--self insert` option can only recognize locally declared member variables, not ones inherited from superclasses or extensions in other files, so it cannot insert missing `self` references for those. Note that the reverse is not true: `--self remove` should remove *all* redundant `self` references.
 
-* The `trailingClosures` rule can generate ambiguous code if a function has multiple optional closure arguments, or if multiple functions have signatures differing only by the name of the closure argument. For this reason, the rule is limited to anonymous closure arguments by default. You can use the `--trailingclosures` and `--nevertrailing` arguments to explicitly opt in or out of trailing closure support for specific functions.
+* The `trailingClosures` rule can generate ambiguous code if a function has multiple optional closure arguments, or if multiple functions have signatures differing only by the name of the closure argument. For this reason, the rule is limited to anonymous closure arguments by default. You can use the `--trailing-closures` and `--never-trailing` arguments to explicitly opt in or out of trailing closure support for specific functions.
 
 * The `isEmpty` rule will convert `count == 0` to `isEmpty` even for types that do not have an `isEmpty` method, such as `NSArray`/`NSDictionary`/etc. Use of Foundation collections in Swift code is pretty rare, but just in case, the rule is disabled by default.
 
@@ -993,11 +1146,15 @@ Known issues
 
 * If compiling for macOS with Xcode 14.0 and configuring SwiftFormat with `--swift-version 5.7`, the `genericExtensions` rule may cause a build failure by updating extensions of the format `extension Collection where Element == Foo` to `extension Collection<Foo>`. This fails to compile for macOS in Xcode 14.0, because the macOS SDK in that version of Xcode [does not include](https://forums.swift.org/t/xcode-14-rc-cannot-specialize-protocol-type/60171) the Swift 5.7 standard library. Workarounds include using `--swift-version 5.6` instead, updating to Xcode 14.1+, or disabling the `genericExtensions` rule (e.g. with `// swiftformat:disable:next genericExtensions`).
 
-* The `propertyTypes` rule can cause a build failure in cases where there are multiple static overloads with the same name but different return types. As a workaround you can rename the overloads to no longer conflict, or exclude the property name with `--preservesymbols propertyName,otherPropertyName,etc`.
+* The `propertyTypes` rule can cause a build failure in cases where there are multiple static overloads with the same name but different return types. As a workaround you can rename the overloads to no longer conflict, or exclude the property name with `--preserve-symbols propertyName,otherPropertyName,etc`.
 
-* The `propertyTypes` rule can cause a build failure in cases where the property's type is a protocol / existential like `let shapeStyle: ShapeStyle = .myShapeStyle`, and the value used on the right-hand side is defined in an extension like `extension ShapeStyle where Self == MyShapeStyle { static var myShapeStyle: MyShapeStyle { ... } }`. As a workaround you can use the existential `any` syntax (`let shapeStyle: any ShapeStyle = .myShapeStyle`), which the rule will preserve as-is, or exclude the type name and/or property name with `--preservesymbols ShapeStyle,myShapeStyle,etc`.
+* The `propertyTypes` rule can cause a build failure in cases where the property's type is a protocol / existential like `let shapeStyle: ShapeStyle = .myShapeStyle`, and the value used on the right-hand side is defined in an extension like `extension ShapeStyle where Self == MyShapeStyle { static var myShapeStyle: MyShapeStyle { ... } }`. As a workaround you can use the existential `any` syntax (`let shapeStyle: any ShapeStyle = .myShapeStyle`), which the rule will preserve as-is, or exclude the type name and/or property name with `--preserve-symbols ShapeStyle,myShapeStyle,etc`.
 
-* The `propertyTypes` rule can cause a build failure in cases like `let foo = Foo.bar` where the value is a static member that doesn't return the same time. For example, `let foo: Foo = .bar` would be invalid if the `bar` property was defined as `static var bar: Bar`. As a workaround you can write the name of the type explicitly, like `let foo: Bar = Foo.bar`, or exclude the type name and/or property name with `--preservesymbols Bar,bar,etc`.
+* The `propertyTypes` rule can cause a build failure in cases like `let foo = Foo.bar` where the value is a static member that doesn't return the same time. For example, `let foo: Foo = .bar` would be invalid if the `bar` property was defined as `static var bar: Bar`. As a workaround you can write the name of the type explicitly, like `let foo: Bar = Foo.bar`, or exclude the type name and/or property name with `--preserve-symbols Bar,bar,etc`.
+
+* The `propertyTypes` rule can cause a build failure in cases like `let value = Tools.makeString()` where `Tools` is used as a namespace (e.g. a caseless enum) and `makeString()` is a static factory method that returns a different type (e.g. `String`). The rule converts this to `let value: Tools = .makeString()`, which fails to compile. As a workaround you can write the type explicitly, like `let value: String = Tools.makeString()`, or exclude the type name and/or property name with `--preserve-symbols Tools,makeString,etc`, or use `// swiftformat:disable:next propertyTypes`.
+
+* The `redundantEquatable` rule may incorrectly remove a `==` implementation that intentionally overrides a default `==` provided by another protocol. For example, `Strideable` provides a default `==` implementation derived from `distance(to:)`, and a type may override it with a custom `==`. SwiftFormat handles this case when the `Strideable` conformance is defined in the same file, but it cannot detect conformances in a different file, nor default `==` implementations provided by other protocols. As a workaround you can use the `// swiftformat:disable:next redundantEquatable` comment directive to disable the rule for the affected type (or just disable the `redundantEquatable` rule completely).
 
 
 Tip Jar

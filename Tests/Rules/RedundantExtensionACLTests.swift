@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantExtensionACLTests: XCTestCase {
+final class RedundantExtensionACLTests: XCTestCase {
     func testPublicExtensionMemberACLStripped() {
         let input = """
         public extension Foo {
@@ -25,7 +25,7 @@ class RedundantExtensionACLTests: XCTestCase {
             func quux() {}
         }
         """
-        testFormatting(for: input, output, rule: .redundantExtensionACL)
+        testFormatting(for: input, output, rule: .redundantExtensionACL, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testPrivateExtensionMemberACLNotStrippedUnlessFileprivate() {
@@ -43,6 +43,6 @@ class RedundantExtensionACLTests: XCTestCase {
             func quux() {}
         }
         """
-        testFormatting(for: input, output, rule: .redundantExtensionACL)
+        testFormatting(for: input, output, rule: .redundantExtensionACL, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 }

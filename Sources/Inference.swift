@@ -138,7 +138,7 @@ private struct Inference {
         options.linebreak = linebreak
     }
 
-    let allowInlineSemicolons = OptionInferrer { formatter, options in
+    let semicolons = OptionInferrer { formatter, options in
         var allow = false
         for (i, token) in formatter.tokens.enumerated() {
             guard case .delimiter(";") = token else {
@@ -149,7 +149,7 @@ private struct Inference {
                 break
             }
         }
-        options.allowInlineSemicolons = allow
+        options.semicolons = allow ? .inlineOnly : .never
     }
 
     let noSpaceOperators = OptionInferrer { formatter, options in
@@ -235,7 +235,7 @@ private struct Inference {
                 noTrailing += 1
             }
         }
-        options.trailingCommas = (trailing >= noTrailing)
+        options.trailingCommas = (trailing >= noTrailing) ? .always : .never
     }
 
     let truncateBlankLines = OptionInferrer { formatter, options in
@@ -302,7 +302,8 @@ private struct Inference {
     }
 
     let ifdefIndent = OptionInferrer { formatter, options in
-        var indented = 0, notIndented = 0, outdented = 0
+        var indented = 0, notIndented = 0, outdented = 0, preserveCandidates = 0
+
         formatter.forEach(.startOfScope("#if")) { i, _ in
             if let indent = formatter.token(at: i - 1), case let .space(string) = indent,
                !string.isEmpty
@@ -318,6 +319,11 @@ private struct Inference {
                             return
                         } else if innerString == string {
                             notIndented += 1
+                            if let token = formatter.next(.nonSpaceOrCommentOrLinebreak, after: nextLineIndex),
+                               case .operator(".", _) = token
+                            {
+                                preserveCandidates += 1
+                            }
                         } else {
                             // Assume more indented, as less would be a mistake
                             indented += 1
@@ -360,7 +366,13 @@ private struct Inference {
             // Error?
         }
         if notIndented > indented {
-            options.ifdefIndent = outdented > notIndented ? .outdent : .noIndent
+            if outdented > notIndented {
+                options.ifdefIndent = .outdent
+            } else if preserveCandidates > 0 {
+                options.ifdefIndent = .preserve
+            } else {
+                options.ifdefIndent = .noIndent
+            }
         } else {
             options.ifdefIndent = outdented > indented ? .outdent : .indent
         }
@@ -563,7 +575,7 @@ private struct Inference {
         var functionArgsRemoved = 0, functionArgsKept = 0
         var unnamedFunctionArgsRemoved = 0, unnamedFunctionArgsKept = 0
 
-        func removeUsed<T>(from argNames: inout [String], with associatedData: inout [T], in range: CountableRange<Int>) {
+        func removeUsed(from argNames: inout [String], with associatedData: inout [some Any], in range: CountableRange<Int>) {
             for i in range {
                 let token = formatter.tokens[i]
                 if case .identifier = token, let index = argNames.firstIndex(of: token.unescaped()),
@@ -670,7 +682,9 @@ private struct Inference {
                          isTypeRoot: Bool,
                          isInit: Bool)
         {
-            var selfRequired: Set<String> { formatter.options.selfRequired }
+            var selfRequired: Set<String> {
+                formatter.options.selfRequired
+            }
             let currentScope = formatter.currentScope(at: index)
             let isWhereClause = index > 0 && formatter.tokens[index - 1] == .keyword("where")
             assert(isWhereClause || currentScope.map { token -> Bool in
@@ -758,7 +772,7 @@ private struct Inference {
                     i += 1
                 }
             }
-            if let type = type {
+            if let type {
                 membersByType[type] = members
                 classMembersByType[type] = classMembers
             }
@@ -880,14 +894,9 @@ private struct Inference {
                 case let .keyword(name):
                     lastKeyword = name
                     lastKeywordIndex = index
-                case .startOfScope("//"), .startOfScope("/*"):
-                    if case let .commentBody(comment)? = formatter.next(.nonSpace, after: index) {
-                        formatter.processCommentBody(comment, at: index)
-                        if token == .startOfScope("//") {
-                            formatter.processLinebreak()
-                        }
-                    }
+                case .startOfScope("/*"), .startOfScope("//"):
                     index = formatter.endOfScope(at: index) ?? (formatter.tokens.count - 1)
+                    formatter.updateEnablement(at: index)
                 case .startOfScope("("):
                     if case let .identifier(fn)? = formatter.last(.nonSpaceOrCommentOrLinebreak, before: index),
                        selfRequired.contains(fn) || fn == "expect"
@@ -997,7 +1006,7 @@ private struct Inference {
                         }
                         prevIndex -= 1
                     }
-                    if let name = name {
+                    if let name {
                         processAccessors(["get", "set", "willSet", "didSet", "init", "_modify"], for: name,
                                          at: &index, localNames: localNames, members: members,
                                          typeStack: &typeStack, membersByType: &membersByType,
@@ -1107,7 +1116,7 @@ private struct Inference {
                         return
                     }
                 case .linebreak:
-                    formatter.processLinebreak()
+                    formatter.updateEnablement(at: index)
                 default:
                     break
                 }
@@ -1276,7 +1285,7 @@ private struct Inference {
         options.spaceAroundOperatorDeclarations = nospace > space ? .remove : .insert
     }
 
-    let elseOnNextLine = OptionInferrer { formatter, options in
+    let elsePosition = OptionInferrer { formatter, options in
         var sameLine = 0, nextLine = 0
         formatter.forEach(.keyword) { i, token in
             guard [.keyword("else"), .keyword("catch"), .keyword("while")].contains(token) else { return }
@@ -1297,7 +1306,7 @@ private struct Inference {
                 sameLine += 1
             }
         }
-        options.elseOnNextLine = (sameLine < nextLine)
+        options.elsePosition = sameLine < nextLine ? .nextLine : .sameLine
     }
 
     let indentCase = OptionInferrer { formatter, options in

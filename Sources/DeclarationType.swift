@@ -228,7 +228,7 @@ extension Declaration {
                 //    immediately follows the `func` keyword:
                 //    https://docs.swift.org/swift-book/ReferenceManual/Declarations.html#grammar_function-name
                 let methodName = formatter.next(.nonSpaceOrCommentOrLinebreak, after: keywordIndex)
-                if let methodName = methodName, lifecycleMethods.contains(methodName.string) {
+                if let methodName, lifecycleMethods.contains(methodName.string) {
                     return .instanceLifecycle
                 }
                 if isOverriddenDeclaration, availableTypes.contains(.overriddenMethod) {
@@ -250,7 +250,7 @@ extension Declaration {
                 return .instanceLifecycle
 
             // Type-like declarations
-            case "typealias":
+            case "typealias", "associatedtype":
                 return .nestedType
 
             case "case":
@@ -262,10 +262,11 @@ extension Declaration {
         }
     }
 
+    /// The SwiftUI property wrapper type attached to this declaration, if present.
+    /// Only returns the base attribute name, e.g. `@Environment`, not `@Environment(\.type)`
     var swiftUIPropertyWrapper: String? {
-        modifiers.first { modifier in
-            swiftUIPropertyWrappers.contains(modifier)
-        }
+        modifiers.first(where: { $0.hasPrefix("@SwiftUI::") })
+            ?? swiftUIPropertyWrappers.first(where: { hasModifier($0) })
     }
 
     /// Represents all the native SwiftUI property wrappers that conform to `DynamicProperty` and cause a SwiftUI view to re-render.
@@ -274,6 +275,7 @@ extension Declaration {
         [
             "@AccessibilityFocusState",
             "@AppStorage",
+            "@Bindable",
             "@Binding",
             "@Environment",
             "@EnvironmentObject",

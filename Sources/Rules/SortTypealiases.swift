@@ -53,6 +53,8 @@ public extension FormatRule {
                     elementEndIndex = formatter.endOfLine(at: elementEndIndex) - 1
                 }
 
+                guard elementEndIndex >= elementStartIndex else { return }
+
                 let tokens = Array(formatter.tokens[elementStartIndex ... elementEndIndex])
                 let typeName = tokens
                     .filter { !$0.isSpaceOrCommentOrLinebreak && !$0.isOperator }
@@ -146,6 +148,20 @@ public extension FormatRule {
                         with: newElement.allTokens
                     )
                 }
+            }
+
+            // If sorting moved an `any` keyword to a position other than the start of the
+            // composition, move it back to the start. In `any Foo & Bar`, the `any` applies
+            // to the entire composition and must remain at the beginning.
+            if let newEqualsIndex = formatter.index(of: .operator("=", .infix), after: typealiasIndex),
+               let startOfType = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: newEqualsIndex),
+               let (_, _, endOfComposition) = formatter.parseProtocolCompositionTypealias(at: typealiasIndex),
+               let firstAnd = formatter.index(of: .operator("&", .infix), after: newEqualsIndex),
+               let anyIndex = formatter.index(of: .identifier("any"), in: firstAnd ... endOfComposition)
+            {
+                let removeEnd = formatter.token(at: anyIndex + 1)?.isSpace == true ? anyIndex + 1 : anyIndex
+                formatter.removeTokens(in: anyIndex ... removeEnd)
+                formatter.insert([.identifier("any"), .space(" ")], at: startOfType)
             }
         }
     } examples: {

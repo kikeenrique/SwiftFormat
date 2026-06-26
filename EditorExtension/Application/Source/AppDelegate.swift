@@ -32,7 +32,7 @@
 import Cocoa
 
 @main
-class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow? {
         NSApp.mainWindow
     }
@@ -48,9 +48,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let options: Options
         do {
-            let args = try parseConfigFile(data)
-            options = try Options(args, in: url.deletingLastPathComponent().path)
-            OptionsStore().inferOptions = Set(args.keys)
+            let configs = try parseConfigFile(data)
+
+            if configs.count > 1 {
+                showError(FormatError.options("""
+                SwiftFormat for Xcode doesn't support config files with segment headers, \
+                loaded first segment
+                """))
+            }
+
+            options = try Options(configs[0], in: url.deletingLastPathComponent().path)
+            OptionsStore().inferOptions = Set(configs[0].keys)
                 .intersection(formattingArguments)
                 .subtracting([Descriptors.swiftVersion.argumentName])
                 .isEmpty
@@ -87,7 +95,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @IBAction func openConfiguration(_: NSMenuItem) {
-        guard let window = window else {
+        guard let window else {
             return
         }
 
@@ -108,7 +116,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @IBAction func saveConfiguration(_: NSMenuItem) {
-        guard let window = window else {
+        guard let window else {
             return
         }
 
@@ -137,7 +145,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showError(_ error: Error) {
-        guard let window = window else {
+        guard let window else {
             return
         }
 

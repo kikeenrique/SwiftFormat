@@ -32,7 +32,7 @@
 import XCTest
 @testable import Consumer
 
-class ConsumerTests: XCTestCase {
+final class ConsumerTests: XCTestCase {
     // MARK: Primitives
 
     func testString() {
@@ -391,11 +391,11 @@ class ConsumerTests: XCTestCase {
         XCTAssertEqual(Consumer<String>.string("Thanks 👍").description, "'Thanks 👍'")
     }
 
-    func testCharacterDescription() {
+    func testCharacterDescription() throws {
         XCTAssertEqual(Consumer<String>.character("!").description, "'!'")
         XCTAssertEqual(Consumer<String>.character(in: "A" ... "F").description, "'A' – 'F'")
-        XCTAssertEqual(Consumer<String>
-            .character(in: UnicodeScalar(11)! ... UnicodeScalar(17)!).description, "U+000B – U+0011")
+        XCTAssertEqual(try Consumer<String>
+            .character(in: XCTUnwrap(UnicodeScalar(11)) ... UnicodeScalar(17)!).description, "U+000B – U+0011")
         XCTAssertEqual(Consumer<String>.character(in: "👍" ... "👍").description, "'👍'")
         XCTAssertEqual(Consumer<String>.character(in: "12").description, "'1' or '2'")
         XCTAssertEqual(Consumer<String>.character(in: "1356").description, "'1', '3', '5' or '6'")
@@ -808,6 +808,6 @@ class ConsumerTests: XCTestCase {
 
     func testLabelledListTransform() {
         let parser: Consumer<String> = .oneOrMore("foo")
-        XCTAssertEqual(try parser.match("foofoo").transform { $1 } as! [String], ["foo", "foo"])
+        XCTAssertEqual(try parser.match("foofoo").transform { $1 } as? [String], ["foo", "foo"])
     }
 }

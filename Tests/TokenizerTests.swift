@@ -32,7 +32,7 @@
 import SwiftFormat
 import XCTest
 
-class TokenizerTests: XCTestCase {
+final class TokenizerTests: XCTestCase {
     // MARK: Invalid input
 
     func testInvalidToken() {
@@ -545,6 +545,39 @@ class TokenizerTests: XCTestCase {
             .linebreak("\n", 1),
             .stringBody("\\\"\"\""),
             .linebreak("\n", 2),
+            .endOfScope("\"\"\""),
+        ]
+        XCTAssertEqual(tokenize(input), output)
+    }
+
+    func testMultilineStringWithTrailingSpaceAfterQuotes() {
+        let input = "\"\"\"   \n    hello \\\n\"\"\" "
+        let output: [Token] = [
+            .startOfScope("\"\"\""),
+            .space("   "),
+            .linebreak("\n", 1),
+            .stringBody("    hello \\"),
+            .linebreak("\n", 2),
+            .endOfScope("\"\"\""),
+            .space(" "),
+        ]
+        XCTAssertEqual(tokenize(input), output)
+    }
+
+    func testMultilineStringWithBlankLines() {
+        let input = """
+        \"\"\"
+        Test
+
+        \"\"\"
+        """
+        let output: [Token] = [
+            .startOfScope("\"\"\""),
+            .linebreak("\n", 1),
+            .stringBody("Test"),
+            .linebreak("\n", 2),
+            .stringBody(""),
+            .linebreak("\n", 3),
             .endOfScope("\"\"\""),
         ]
         XCTAssertEqual(tokenize(input), output)
@@ -2369,6 +2402,39 @@ class TokenizerTests: XCTestCase {
         XCTAssertEqual(tokenize(input), output)
     }
 
+    func testDoubleColonOperator() {
+        let input = "Module::Type"
+        let output: [Token] = [
+            .identifier("Module"),
+            .operator("::", .infix),
+            .identifier("Type"),
+        ]
+        XCTAssertEqual(tokenize(input), output)
+    }
+
+    func testDoubleColonOperatorWithSpaces() {
+        let input = "Module :: Type"
+        let output: [Token] = [
+            .identifier("Module"),
+            .space(" "),
+            .operator("::", .infix),
+            .space(" "),
+            .identifier("Type"),
+        ]
+        XCTAssertEqual(tokenize(input), output)
+    }
+
+    func testDoubleColonOperatorWithLeadingNewline() {
+        let input = "Module\n::Type"
+        let output: [Token] = [
+            .identifier("Module"),
+            .linebreak("\n", 1),
+            .operator("::", .infix),
+            .identifier("Type"),
+        ]
+        XCTAssertEqual(tokenize(input), output)
+    }
+
     // MARK: chevrons (might be operators or generics)
 
     func testLessThanGreaterThan() {
@@ -2571,6 +2637,36 @@ class TokenizerTests: XCTestCase {
             .space(" "),
             .identifier("Another"),
             .endOfScope(")"),
+            .endOfScope(">"),
+        ]
+        XCTAssertEqual(tokenize(input), output)
+    }
+
+    func testValueGeneric() {
+        let input = "func value<let count: Int>() -> InlineArray<count, UInt8>"
+        let output: [Token] = [
+            .keyword("func"),
+            .space(" "),
+            .identifier("value"),
+            .startOfScope("<"),
+            .keyword("let"),
+            .space(" "),
+            .identifier("count"),
+            .delimiter(":"),
+            .space(" "),
+            .identifier("Int"),
+            .endOfScope(">"),
+            .startOfScope("("),
+            .endOfScope(")"),
+            .space(" "),
+            .operator("->", .infix),
+            .space(" "),
+            .identifier("InlineArray"),
+            .startOfScope("<"),
+            .identifier("count"),
+            .delimiter(","),
+            .space(" "),
+            .identifier("UInt8"),
             .endOfScope(">"),
         ]
         XCTAssertEqual(tokenize(input), output)
@@ -5118,6 +5214,77 @@ class TokenizerTests: XCTestCase {
             .space(" "),
             .identifier("Animal"),
             .endOfScope("]"),
+        ]
+        XCTAssertEqual(tokenize(input), output)
+    }
+
+    func testRawIdentifiers() {
+        let input = """
+        func `square returns x * x`() -> Int { 42 }
+        enum ColorVariant { case `50`, `100`, `200` }
+        let `1.circle` = "SF Symbol"
+        struct `class` { let `for` = true }
+        """
+        let output: [Token] = [
+            .keyword("func"),
+            .space(" "),
+            .identifier("`square returns x * x`"),
+            .startOfScope("("),
+            .endOfScope(")"),
+            .space(" "),
+            .operator("->", .infix),
+            .space(" "),
+            .identifier("Int"),
+            .space(" "),
+            .startOfScope("{"),
+            .space(" "),
+            .number("42", .integer),
+            .space(" "),
+            .endOfScope("}"),
+            .linebreak("\n", 1),
+            .keyword("enum"),
+            .space(" "),
+            .identifier("ColorVariant"),
+            .space(" "),
+            .startOfScope("{"),
+            .space(" "),
+            .keyword("case"),
+            .space(" "),
+            .identifier("`50`"),
+            .delimiter(","),
+            .space(" "),
+            .identifier("`100`"),
+            .delimiter(","),
+            .space(" "),
+            .identifier("`200`"),
+            .space(" "),
+            .endOfScope("}"),
+            .linebreak("\n", 2),
+            .keyword("let"),
+            .space(" "),
+            .identifier("`1.circle`"),
+            .space(" "),
+            .operator("=", .infix),
+            .space(" "),
+            .startOfScope("\""),
+            .stringBody("SF Symbol"),
+            .endOfScope("\""),
+            .linebreak("\n", 3),
+            .keyword("struct"),
+            .space(" "),
+            .identifier("`class`"),
+            .space(" "),
+            .startOfScope("{"),
+            .space(" "),
+            .keyword("let"),
+            .space(" "),
+            .identifier("`for`"),
+            .space(" "),
+            .operator("=", .infix),
+            .space(" "),
+            .identifier("true"),
+            .space(" "),
+            .endOfScope("}"),
         ]
         XCTAssertEqual(tokenize(input), output)
     }

@@ -11,9 +11,8 @@ import Foundation
 public extension FormatRule {
     static let docComments = FormatRule(
         help: "Use doc comments for API declarations, otherwise use regular comments.",
-        disabledByDefault: true,
         orderAfter: [.fileHeader],
-        options: ["doccomments"]
+        options: ["doc-comments"]
     ) { formatter in
         formatter.forEach(.startOfScope) { index, token in
             guard [.startOfScope("//"), .startOfScope("/*")].contains(token),
@@ -21,7 +20,19 @@ public extension FormatRule {
             else { return }
 
             var commentIndices = [index]
-            if token == .startOfScope("//") {
+
+            // Check if this is a trailing comment (has non-space tokens before it on the same line)
+            let isTrailingComment: Bool
+            if let previousToken = formatter.index(of: .nonSpaceOrLinebreak, before: index) {
+                let commentLine = formatter.startOfLine(at: index)
+                let previousTokenLine = formatter.startOfLine(at: previousToken)
+                isTrailingComment = (commentLine == previousTokenLine)
+            } else {
+                isTrailingComment = false
+            }
+
+            // Only group comments if this is not a trailing comment
+            if token == .startOfScope("//"), !isTrailingComment {
                 var i = index
                 while let prevLineIndex = formatter.index(of: .linebreak, before: i),
                       case let lineStartIndex = formatter.startOfLine(at: prevLineIndex, excludingIndent: true),
@@ -40,10 +51,7 @@ public extension FormatRule {
                 }
             }
 
-            let useDocComment = formatter.shouldBeDocComment(at: index, endOfComment: endOfComment)
-            guard commentIndices.allSatisfy({
-                formatter.shouldBeDocComment(at: $0, endOfComment: endOfComment) == useDocComment
-            }) else {
+            guard let useDocComment = formatter.shouldBeDocComment(at: commentIndices, endOfComment: endOfComment) else {
                 return
             }
 
@@ -91,14 +99,13 @@ public extension FormatRule {
 
             let isDocComment = formatter.isDocComment(startOfComment: index)
 
-            if isDocComment,
-               let commentBody = formatter.token(at: index + 1),
+            if let commentBody = formatter.token(at: index + 1),
                commentBody.isCommentBody
             {
                 if useDocComment, !isDocComment, !preserveRegularComments {
                     let updatedCommentBody = "\(startOfDocCommentBody)\(commentBody.string)"
                     formatter.replaceToken(at: index + 1, with: .commentBody(updatedCommentBody))
-                } else if !useDocComment, isDocComment, !formatter.options.preserveDocComments {
+                } else if !useDocComment || isTrailingComment, isDocComment, !formatter.options.preserveDocComments {
                     let prefix = commentBody.string.prefix(while: { String($0) == startOfDocCommentBody })
 
                     // Do nothing if this is a unusual comment like `//////////////////`
@@ -138,21 +145,28 @@ public extension FormatRule {
 }
 
 extension Formatter {
+    /// Whether or not the comment at this index can be a doc comment,
+    /// considering the following type declaration and surrounding context.
     func shouldBeDocComment(
-        at index: Int,
+        at indices: [Int],
         endOfComment: Int
-    ) -> Bool {
-        guard let nextDeclarationIndex = self.index(of: .nonSpaceOrCommentOrLinebreak, after: endOfComment) else { return false }
+    ) -> Bool? {
+        guard let startIndex = indices.min(),
+              let nextDeclarationIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: endOfComment)
+        else { return false }
 
-        // Check if this is a special type of comment that isn't documentation
-        if case let .commentBody(body)? = next(.nonSpace, after: index), body.isCommentDirective {
-            return false
+        // Check if this is a directive like MARK or swiftformat:disable etc.
+        // In that case just preserve the comment as-is.
+        for index in indices {
+            if case let .commentBody(body)? = next(.nonSpace, after: index), body.isCommentDirective {
+                return nil
+            }
         }
 
         // Check if this token defines a declaration that supports doc comments
         var declarationToken = tokens[nextDeclarationIndex]
-        if declarationToken.isAttribute || declarationToken.isModifierKeyword,
-           let index = self.index(after: nextDeclarationIndex, where: { $0.isDeclarationTypeKeyword })
+        if declarationToken.isAttribute || isModifier(at: nextDeclarationIndex),
+           let index = index(after: nextDeclarationIndex, where: { $0.isDeclarationTypeKeyword })
         {
             declarationToken = tokens[index]
         }
@@ -160,20 +174,9 @@ extension Formatter {
             return false
         }
 
-        // Only use doc comments on declarations in type bodies, or top-level declarations
-        if let startOfEnclosingScope = self.index(of: .startOfScope, before: index) {
-            switch tokens[startOfEnclosingScope] {
-            case .startOfScope("#if"):
-                break
-            case .startOfScope("{"):
-                guard let scope = lastSignificantKeyword(at: startOfEnclosingScope, excluding: ["where"]),
-                      ["class", "actor", "struct", "enum", "protocol", "extension"].contains(scope)
-                else {
-                    return false
-                }
-            default:
-                return false
-            }
+        // For local declarations other than nested functions, use standard comments.
+        if declarationToken != .keyword("func"), declarationScope(at: startIndex) == .local {
+            return false
         }
 
         // If there are blank lines between comment and declaration, comment is not treated as doc comment
@@ -184,8 +187,8 @@ extension Formatter {
         }
 
         // Only comments at the start of a line can be doc comments
-        if let previousToken = self.index(of: .nonSpaceOrLinebreak, before: index) {
-            let commentLine = startOfLine(at: index)
+        if let previousToken = index(of: .nonSpaceOrLinebreak, before: startIndex) {
+            let commentLine = startOfLine(at: startIndex)
             let previousTokenLine = startOfLine(at: previousToken)
 
             if commentLine == previousTokenLine {
@@ -194,6 +197,6 @@ extension Formatter {
         }
 
         // Comments inside conditional statements are not doc comments
-        return !isConditionalStatement(at: index)
+        return !isConditionalStatement(at: startIndex)
     }
 }

@@ -3,10 +3,11 @@
 // swiftformat:options --self init-only
 // swiftformat:options --stripunusedargs closure-only
 // swiftformat:options --commas inline
-// swiftformat:options --wraparguments before-first
-// swiftformat:options --wrapcollections before-first
+// swiftformat:options --wrap-arguments before-first
+// swiftformat:options --wrap-collections before-first
+// swiftformat:disable --unusedPrivateDeclarations
 
-class ViewController: UIViewController {
+final class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
     }

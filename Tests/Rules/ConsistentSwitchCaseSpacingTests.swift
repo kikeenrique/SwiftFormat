@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class ConsistentSwitchCaseSpacingTests: XCTestCase {
+final class ConsistentSwitchCaseSpacingTests: XCTestCase {
     func testInsertsBlankLinesToMakeSwitchStatementSpacingConsistent1() {
         let input = """
         switch action {
@@ -323,5 +323,129 @@ class ConsistentSwitchCaseSpacingTests: XCTestCase {
         """
 
         testFormatting(for: input, rule: .consistentSwitchCaseSpacing, exclude: [.blankLineAfterSwitchCase])
+    }
+
+    func testConsistentSpacingWithIfdefWrappedCase() {
+        // When the case inside #if already has a blank line after #endif (matching the
+        // other cases), consistentSwitchCaseSpacing should make no changes.
+        let input = """
+        switch action {
+        case .engageWarpDrive:
+            warpDrive.activate()
+
+        #if CLOAKING
+            case .engageCloakingDevice:
+                cloakingDevice.activate()
+        #endif
+
+        case .handleIncomingEnergyBlast:
+            energyShields.engage()
+        }
+        """
+
+        testFormatting(for: input, rule: .consistentSwitchCaseSpacing)
+    }
+
+    func testConsistentSpacingWithMultilineIfdefWrappedCase() {
+        // When the case inside #if doesn't have a blank line after #endif but all
+        // other cases do, consistentSwitchCaseSpacing should insert the blank line after #endif.
+        let input = """
+        switch action {
+        case .engageWarpDrive:
+            navigationComputer.destination = targetedDestination
+            await warpDrive.spinUp()
+            warpDrive.activate()
+
+        #if CLOAKING
+            case .engageCloakingDevice:
+                await cloakingDevice.spinUp()
+                cloakingDevice.activate()
+        #endif
+        case .handleIncomingEnergyBlast:
+            await energyShields.prepare()
+            energyShields.engage()
+        }
+        """
+
+        let output = """
+        switch action {
+        case .engageWarpDrive:
+            navigationComputer.destination = targetedDestination
+            await warpDrive.spinUp()
+            warpDrive.activate()
+
+        #if CLOAKING
+            case .engageCloakingDevice:
+                await cloakingDevice.spinUp()
+                cloakingDevice.activate()
+        #endif
+
+        case .handleIncomingEnergyBlast:
+            await energyShields.prepare()
+            energyShields.engage()
+        }
+        """
+
+        testFormatting(for: input, output, rule: .consistentSwitchCaseSpacing)
+    }
+
+    func testConsistentSpacingWithCasesInIfElseBlock() {
+        // Cases in #if/#else branches are mutually exclusive, so no blank lines are
+        // added between them regardless of the other cases' spacing.
+        let input = """
+        switch action {
+        case .engageWarpDrive:
+            warpDrive.activate()
+
+        #if CLOAKING
+            case .engageCloakingDevice:
+                cloakingDevice.activate()
+        #else
+            case .handleIncomingEnergyBlast:
+                energyShields.engage()
+        #endif
+        }
+        """
+
+        testFormatting(for: input, rule: .consistentSwitchCaseSpacing)
+    }
+
+    func testConsistentSpacingWithIfdefInsideSwitchCase() {
+        let input = """
+        switch foo {
+        case .bar:
+            #if DEBUG
+                print("foo")
+            #endif
+            print("bar")
+
+        case .baaz:
+            print("baaz")
+        }
+        """
+
+        testFormatting(for: input, rule: .consistentSwitchCaseSpacing)
+    }
+
+    func testConsistentSpacingWithIfdefContainingNestedSwitchInsideCase() {
+        let input = """
+        switch foo {
+        case .bar:
+            #if DEBUG
+                switch nested {
+                case .a:
+                    print("a")
+                case .b:
+                    print("b")
+                }
+            #endif
+            print("bar")
+
+        case .baaz:
+            print("baaz")
+        }
+        """
+
+        testFormatting(for: input, rule: .consistentSwitchCaseSpacing)
     }
 }

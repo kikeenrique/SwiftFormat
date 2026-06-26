@@ -32,7 +32,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class ArgumentsTests: XCTestCase {
+final class ArgumentsTests: XCTestCase {
     // MARK: arg parser
 
     func testParseSimpleArguments() {
@@ -119,6 +119,39 @@ class ArgumentsTests: XCTestCase {
         XCTAssertEqual(parseArguments(input, ignoreComments: false), output)
     }
 
+    func testQuotedURLMacro() {
+        let input = "--url-macro \"#URL,URLFoundation\""
+        let output = ["", "--url-macro", "#URL,URLFoundation"]
+        XCTAssertEqual(parseArguments(input, ignoreComments: false), output)
+    }
+
+    func testLegacyOptionsWithLegacyOptionNames() throws {
+        let testCases: [(legacy: String, current: String)] = [
+            ("lineaftermarks", "line-after-marks"),
+            ("indentcase", "indent-case"),
+            ("trailingcommas", "trailing-commas"),
+            ("wrapArguments", "wrap-arguments"),
+            ("hexliteralcase", "hex-literal-case"),
+            ("nospaceoperators", "no-space-operators"),
+            ("modifierorder", "modifier-order"),
+            ("extensionACL", "extension-acl"),
+            ("propertyTypes", "property-types"),
+            ("swiftVersion", "swift-version"),
+        ]
+
+        for (legacy, current) in testCases {
+            do {
+                let legacyArgs = try preprocessArguments(["", "--\(legacy)", "true"], commandLineArguments)
+                let currentArgs = try preprocessArguments(["", "--\(current)", "true"], commandLineArguments)
+
+                // Both should map to the same internal option name
+                XCTAssertEqual(legacyArgs[current] ?? legacyArgs[legacy], currentArgs[current])
+            } catch {
+                XCTFail("Legacy option --\(legacy) should work but failed with: \(error)")
+            }
+        }
+    }
+
     // MARK: arg preprocessor
 
     func testPreprocessArguments() {
@@ -187,26 +220,26 @@ class ArgumentsTests: XCTestCase {
     }
 
     func testDuplicateSelfrequiredArgumentsAreMerged() {
-        let input = ["", "--selfrequired", "foo", "--selfrequired", "bar"]
-        let output = ["0": "", "selfrequired": "foo,bar"]
+        let input = ["", "--self-required", "foo", "--self-required", "bar"]
+        let output = ["0": "", "self-required": "foo,bar"]
         XCTAssertEqual(try preprocessArguments(input, [
-            "selfrequired",
+            "self-required",
         ]), output)
     }
 
     func testDuplicateNoSpaceOperatorsArgumentsAreMerged() {
         let input = ["", "--nospaceoperators", "+", "--nospaceoperators", "*"]
-        let output = ["0": "", "nospaceoperators": "+,*"]
+        let output = ["0": "", "no-space-operators": "+,*"]
         XCTAssertEqual(try preprocessArguments(input, [
-            "nospaceoperators",
+            "no-space-operators",
         ]), output)
     }
 
     func testDuplicateNoWrapOperatorsArgumentsAreMerged() {
         let input = ["", "--nowrapoperators", "+", "--nowrapoperators", "."]
-        let output = ["0": "", "nowrapoperators": "+,."]
+        let output = ["0": "", "no-wrap-operators": "+,."]
         XCTAssertEqual(try preprocessArguments(input, [
-            "nowrapoperators",
+            "no-wrap-operators",
         ]), output)
     }
 
@@ -289,14 +322,14 @@ class ArgumentsTests: XCTestCase {
         XCTAssertNil(try formatOptionsFor(["--disable": "void"]))
     }
 
-    func testFileHeaderOptionToArguments() throws {
+    func testFileHeaderOptionToArguments() {
         let options = FormatOptions(fileHeader: "//  Hello World\n//  Goodbye World")
         let args = argumentsFor(Options(formatOptions: options), excludingDefaults: true)
         XCTAssertEqual(args["header"], "//  Hello World\\n//  Goodbye World")
     }
 
     // TODO: should this go in OptionDescriptorTests instead?
-    func testRenamedArgument() throws {
+    func testRenamedArgument() {
         XCTAssert(Descriptors.specifierOrder.isRenamed)
     }
 
@@ -310,8 +343,33 @@ class ArgumentsTests: XCTestCase {
         """
         let data = Data(config.utf8)
         do {
-            let args = try parseConfigFile(data)
+            let args = try parseConfigFile(data)[0]
             XCTAssertEqual(args.count, 2)
+        } catch {
+            XCTFail("\(error)")
+        }
+    }
+
+    func testParseConfigFileWithHeaders() {
+        let config = """
+        --allman true
+        --rules braces,fileHeader
+
+        [Header]
+        --filter Foo
+        --allman false
+
+        [Header2]
+        --filter Bar
+        --indent 4
+        """
+        let data = Data(config.utf8)
+        do {
+            let segments = try parseConfigFile(data)
+            XCTAssertEqual(segments.count, 3)
+            XCTAssertEqual(segments[0].count, 2)
+            XCTAssertEqual(segments[1].count, 2)
+            XCTAssertEqual(segments[2].count, 2)
         } catch {
             XCTFail("\(error)")
         }
@@ -323,7 +381,7 @@ class ArgumentsTests: XCTestCase {
         --allman true
         """
         let data = Data(config.utf8)
-        XCTAssertThrowsError(try parseConfigFile(data)) { error in
+        XCTAssertThrowsError(try parseConfigFile(data)[0]) { error in
             guard case let FormatError.options(message) = error else {
                 XCTFail("\(error)")
                 return
@@ -335,9 +393,26 @@ class ArgumentsTests: XCTestCase {
     func testParseArgumentsContainingSpaces() throws {
         let config = "--rules braces, fileHeader, consecutiveSpaces"
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         XCTAssertEqual(args.count, 1)
         XCTAssertEqual(args["rules"], "braces, fileHeader, consecutiveSpaces")
+    }
+
+    func testParseURLMacroArgumentInConfigFileFailsWithoutQuotes() throws {
+        let config = "--url-macro #URL,URLFoundation"
+        let data = Data(config.utf8)
+        let args = try parseConfigFile(data)[0]
+        // This should fail because #URL,URLFoundation is treated as a comment
+        XCTAssertEqual(args.count, 1)
+        XCTAssertEqual(args["url-macro"], "")
+    }
+
+    func testParseURLMacroArgumentInConfigFileWithQuotes() throws {
+        let config = "--url-macro \"#URL,URLFoundation\""
+        let data = Data(config.utf8)
+        let args = try parseConfigFile(data)[0]
+        XCTAssertEqual(args.count, 1)
+        XCTAssertEqual(args["url-macro"], "#URL,URLFoundation")
     }
 
     func testParseArgumentsOnMultipleLines() throws {
@@ -351,10 +426,10 @@ class ArgumentsTests: XCTestCase {
                 8
         """
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         XCTAssertEqual(args["rules"], "braces, fileHeader, andOperator, typeSugar")
         XCTAssertEqual(args["allman"], "true")
-        XCTAssertEqual(args["hexgrouping"], "4, 8")
+        XCTAssertEqual(args["hex-grouping"], "4, 8")
     }
 
     func testCommentsInConsecutiveLines() throws {
@@ -370,9 +445,9 @@ class ArgumentsTests: XCTestCase {
                 8           # comment invalidating this line separator \\
         """
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         XCTAssertEqual(args["rules"], "braces, fileHeader, andOperator")
-        XCTAssertEqual(args["hexgrouping"], "4, 8")
+        XCTAssertEqual(args["hex-grouping"], "4, 8")
     }
 
     func testLineContinuationCharacterOnLastLine() throws {
@@ -381,7 +456,7 @@ class ArgumentsTests: XCTestCase {
                 fileHeader\\
         """
         let data = Data(config.utf8)
-        XCTAssertThrowsError(try parseConfigFile(data)) {
+        XCTAssertThrowsError(try parseConfigFile(data)[0]) {
             XCTAssert($0.localizedDescription.contains("line continuation character"))
         }
     }
@@ -389,7 +464,7 @@ class ArgumentsTests: XCTestCase {
     func testParseArgumentsContainingEscapedCharacters() throws {
         let config = "--header hello\\ world\\ngoodbye\\ world"
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         XCTAssertEqual(args.count, 1)
         XCTAssertEqual(args["header"], "hello world\\ngoodbye world")
     }
@@ -399,7 +474,7 @@ class ArgumentsTests: XCTestCase {
         --header "hello world\\ngoodbye world"
         """
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         XCTAssertEqual(args.count, 1)
         XCTAssertEqual(args["header"], "hello world\\ngoodbye world")
     }
@@ -407,7 +482,7 @@ class ArgumentsTests: XCTestCase {
     func testParseIgnoreFileHeader() throws {
         let config = "--header ignore"
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         let options = try Options(args, in: "/")
         XCTAssertEqual(options.formatOptions?.fileHeader, .ignore)
     }
@@ -415,7 +490,7 @@ class ArgumentsTests: XCTestCase {
     func testParseUppercaseIgnoreFileHeader() throws {
         let config = "--header IGNORE"
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         let options = try Options(args, in: "/")
         XCTAssertEqual(options.formatOptions?.fileHeader, .ignore)
     }
@@ -423,28 +498,28 @@ class ArgumentsTests: XCTestCase {
     func testParseArgumentsContainingSwiftVersion() throws {
         let config = "--swiftversion 5.1"
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         XCTAssertEqual(args.count, 1)
-        XCTAssertEqual(args["swiftversion"], "5.1")
+        XCTAssertEqual(args["swift-version"], "5.1")
     }
 
     func testParseArgumentsContainingLanguageVersion() throws {
         let config = "--languagemode 6"
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         XCTAssertEqual(args.count, 1)
-        XCTAssertEqual(args["languagemode"], "6")
+        XCTAssertEqual(args["language-mode"], "6")
     }
 
     func testParseArgumentsContainingDisableAll() throws {
         let config = "--disable all"
         let data = Data(config.utf8)
-        let args = try parseConfigFile(data)
+        let args = try parseConfigFile(data)[0]
         let options = try Options(args, in: "/")
         XCTAssertEqual(options.rules, [])
     }
 
-    func testPopulatesDefaultLanguageMode() throws {
+    func testPopulatesDefaultLanguageMode() {
         let swift5Options = FormatOptions(swiftVersion: "5.0")
         XCTAssertEqual(swift5Options.languageMode, "5")
 
@@ -459,46 +534,58 @@ class ArgumentsTests: XCTestCase {
 
     // file header comment encoding
 
-    func testSerializeFileHeaderContainingSpace() throws {
+    func testSerializeFileHeaderContainingSpace() {
         let options = Options(formatOptions: FormatOptions(fileHeader: "// hello world"))
         let config = serialize(options: options, excludingDefaults: true)
         XCTAssertEqual(config, "--header \"// hello world\"")
     }
 
-    func testSerializeFileHeaderContainingEscapedSpace() throws {
+    func testSerializeFileHeaderContainingEscapedSpace() {
         let options = Options(formatOptions: FormatOptions(fileHeader: "// hello\\ world"))
         let config = serialize(options: options, excludingDefaults: true)
         XCTAssertEqual(config, "--header \"// hello\\ world\"")
     }
 
-    func testSerializeFileHeaderContainingLinebreak() throws {
+    func testSerializeFileHeaderContainingLinebreak() {
         let options = Options(formatOptions: FormatOptions(fileHeader: "//hello\nworld"))
         let config = serialize(options: options, excludingDefaults: true)
         XCTAssertEqual(config, "--header //hello\\nworld")
     }
 
-    func testSerializeFileHeaderContainingLinebreakAndSpaces() throws {
+    func testSerializeFileHeaderContainingLinebreakAndSpaces() {
         let options = Options(formatOptions: FormatOptions(fileHeader: "// hello\n// world"))
         let config = serialize(options: options, excludingDefaults: true)
         XCTAssertEqual(config, "--header \"// hello\\n// world\"")
     }
 
+    func testSerializeOptionsWithPoundCharacter() {
+        let options = Options(formatOptions: FormatOptions(
+            urlMacro: .macro("#URL", module: "URLFoundation"),
+            preferFileMacro: false
+        ))
+        let config = serialize(options: options, excludingDefaults: true)
+        XCTAssertEqual(config, """
+        --file-macro "#fileID"
+        --url-macro "#URL,URLFoundation"
+        """)
+    }
+
     // trailing separator
 
-    func testSerializeOptionsDisabledDefaultRulesEnabledIsEmpty() throws {
+    func testSerializeOptionsDisabledDefaultRulesEnabledIsEmpty() {
         let rules = defaultRules
         let config: String = serialize(options: Options(formatOptions: nil, rules: rules))
         XCTAssertEqual(config, "")
     }
 
-    func testSerializeOptionsDisabledAllRulesEnabledNoTerminatingSeparator() throws {
+    func testSerializeOptionsDisabledAllRulesEnabledNoTerminatingSeparator() {
         let rules = allRules
         let config: String = serialize(options: Options(formatOptions: nil, rules: rules))
         XCTAssertFalse(config.contains("--disable"))
         XCTAssertNotEqual(config.last, "\n")
     }
 
-    func testSerializeOptionsDisabledSomeRulesDisabledNoTerminatingSeparator() throws {
+    func testSerializeOptionsDisabledSomeRulesDisabledNoTerminatingSeparator() {
         let rules = Set(defaultRules.prefix(3))
         let config: String = serialize(options: Options(formatOptions: nil, rules: rules))
         XCTAssertTrue(config.contains("--disable"))
@@ -506,7 +593,7 @@ class ArgumentsTests: XCTestCase {
         XCTAssertNotEqual(config.last, "\n")
     }
 
-    func testSerializeOptionsEnabledDefaultRulesEnabledNoTerminatingSeparator() throws {
+    func testSerializeOptionsEnabledDefaultRulesEnabledNoTerminatingSeparator() {
         let rules = defaultRules
         let config: String = serialize(options: Options(formatOptions: .default, rules: rules))
         XCTAssertNotEqual(config, "")
@@ -515,14 +602,14 @@ class ArgumentsTests: XCTestCase {
         XCTAssertNotEqual(config.last, "\n")
     }
 
-    func testSerializeOptionsEnabledAllRulesEnabledNoTerminatingSeparator() throws {
+    func testSerializeOptionsEnabledAllRulesEnabledNoTerminatingSeparator() {
         let rules = allRules
         let config: String = serialize(options: Options(formatOptions: .default, rules: rules))
         XCTAssertFalse(config.contains("--disable"))
         XCTAssertNotEqual(config.last, "\n")
     }
 
-    func testSerializeOptionsEnabledSomeRulesDisabledNoTerminatingSeparator() throws {
+    func testSerializeOptionsEnabledSomeRulesDisabledNoTerminatingSeparator() {
         let rules = Set(defaultRules.prefix(3))
         let config: String = serialize(options: Options(formatOptions: .default, rules: rules))
         XCTAssertTrue(config.contains("--disable"))
@@ -532,18 +619,18 @@ class ArgumentsTests: XCTestCase {
 
     // swift version
 
-    func testSerializeSwiftVersion() throws {
+    func testSerializeSwiftVersion() {
         let version = Version(rawValue: "5.2") ?? "0"
         let options = Options(formatOptions: FormatOptions(swiftVersion: version))
         let config = serialize(options: options, excludingDefaults: true)
-        XCTAssertEqual(config, "--swiftversion 5.2")
+        XCTAssertEqual(config, "--swift-version 5.2")
     }
 
     // MARK: config file merging
 
     func testMergeFormatOptionArguments() throws {
         let args = ["allman": "false", "commas": "always"]
-        let config = ["allman": "true", "binarygrouping": "4,8"]
+        let config = ["allman": "true", "binary-grouping": "4,8"]
         let result = try mergeArguments(args, into: config)
         for (key, value) in result {
             // args take precedence over config
@@ -573,7 +660,7 @@ class ArgumentsTests: XCTestCase {
         let args = ["rules": "braces,fileHeader"]
         let config = ["rules": "consecutiveSpaces,braces"]
         let result = try mergeArguments(args, into: config)
-        let rules = try parseRules(result["rules"]!)
+        let rules = try parseRules(XCTUnwrap(result["rules"]), ignoreUnknown: false)
         XCTAssertEqual(rules, ["braces", "fileHeader"])
     }
 
@@ -581,7 +668,7 @@ class ArgumentsTests: XCTestCase {
         let args = ["rules": ""]
         let config = ["rules": "consecutiveSpaces,braces"]
         let result = try mergeArguments(args, into: config)
-        let rules = try parseRules(result["rules"]!)
+        let rules = try parseRules(XCTUnwrap(result["rules"]), ignoreUnknown: false)
         XCTAssertEqual(Set(rules), Set(["braces", "consecutiveSpaces"]))
     }
 
@@ -589,7 +676,7 @@ class ArgumentsTests: XCTestCase {
         let args = ["enable": "braces,fileHeader"]
         let config = ["enable": "consecutiveSpaces,braces"]
         let result = try mergeArguments(args, into: config)
-        let enabled = try parseRules(result["enable"]!)
+        let enabled = try parseRules(XCTUnwrap(result["enable"]), ignoreUnknown: false)
         XCTAssertEqual(enabled, ["braces", "consecutiveSpaces", "fileHeader"])
     }
 
@@ -597,7 +684,7 @@ class ArgumentsTests: XCTestCase {
         let args = ["disable": "braces,fileHeader"]
         let config = ["disable": "consecutiveSpaces,braces"]
         let result = try mergeArguments(args, into: config)
-        let disabled = try parseRules(result["disable"]!)
+        let disabled = try parseRules(XCTUnwrap(result["disable"]), ignoreUnknown: false)
         XCTAssertEqual(disabled, ["braces", "consecutiveSpaces", "fileHeader"])
     }
 
@@ -605,7 +692,7 @@ class ArgumentsTests: XCTestCase {
         let args = ["rules": "braces,fileHeader"]
         let config = ["rules": "consecutiveSpaces", "disable": "braces", "enable": "redundantSelf"]
         let result = try mergeArguments(args, into: config)
-        let disabled = try parseRules(result["rules"]!)
+        let disabled = try parseRules(XCTUnwrap(result["rules"]), ignoreUnknown: false)
         XCTAssertEqual(disabled, ["braces", "fileHeader"])
         XCTAssertNil(result["enabled"])
         XCTAssertNil(result["disabled"])
@@ -615,11 +702,11 @@ class ArgumentsTests: XCTestCase {
         let args = ["enable": "braces"]
         let config = ["rules": "fileHeader", "disable": "consecutiveSpaces,braces"]
         let result = try mergeArguments(args, into: config)
-        let rules = try parseRules(result["rules"]!)
+        let rules = try parseRules(XCTUnwrap(result["rules"]), ignoreUnknown: false)
         XCTAssertEqual(rules, ["fileHeader"])
-        let enabled = try parseRules(result["enable"]!)
+        let enabled = try parseRules(XCTUnwrap(result["enable"]), ignoreUnknown: false)
         XCTAssertEqual(enabled, ["braces"])
-        let disabled = try parseRules(result["disable"]!)
+        let disabled = try parseRules(XCTUnwrap(result["disable"]), ignoreUnknown: false)
         XCTAssertEqual(disabled, ["consecutiveSpaces"])
     }
 
@@ -627,19 +714,19 @@ class ArgumentsTests: XCTestCase {
         let args = ["disable": "braces"]
         let config = ["rules": "braces,fileHeader", "enable": "consecutiveSpaces,braces"]
         let result = try mergeArguments(args, into: config)
-        let rules = try parseRules(result["rules"]!)
+        let rules = try parseRules(XCTUnwrap(result["rules"]), ignoreUnknown: false)
         XCTAssertEqual(rules, ["fileHeader"])
-        let enabled = try parseRules(result["enable"]!)
+        let enabled = try parseRules(XCTUnwrap(result["enable"]), ignoreUnknown: false)
         XCTAssertEqual(enabled, ["consecutiveSpaces"])
-        let disabled = try parseRules(result["disable"]!)
+        let disabled = try parseRules(XCTUnwrap(result["disable"]), ignoreUnknown: false)
         XCTAssertEqual(disabled, ["braces"])
     }
 
     func testMergeSelfRequiredOptions() throws {
-        let args = ["selfrequired": "log,assert"]
-        let config = ["selfrequired": "expect"]
+        let args = ["self-required": "log,assert"]
+        let config = ["self-required": "expect"]
         let result = try mergeArguments(args, into: config)
-        let selfRequired = parseCommaDelimitedList(result["selfrequired"]!)
+        let selfRequired = try parseCommaDelimitedList(XCTUnwrap(result["self-required"]))
         XCTAssertEqual(selfRequired, ["log", "assert"])
     }
 
@@ -647,7 +734,7 @@ class ArgumentsTests: XCTestCase {
         let args = ["acronyms": "url"]
         let config = ["acronyms": "id,uuid"]
         let result = try mergeArguments(args, into: config)
-        let acronyms = parseCommaDelimitedList(result["acronyms"]!)
+        let acronyms = try parseCommaDelimitedList(XCTUnwrap(result["acronyms"]))
         XCTAssertEqual(acronyms, ["url"])
     }
 
@@ -655,7 +742,7 @@ class ArgumentsTests: XCTestCase {
 
     func testAddFormatArguments() throws {
         var options = Options(
-            formatOptions: FormatOptions(indent: " ", allowInlineSemicolons: true)
+            formatOptions: FormatOptions(indent: " ", semicolons: .inlineOnly)
         )
         try options.addArguments(["indent": "2", "linebreaks": "crlf"], in: "")
         guard let formatOptions = options.formatOptions else {
@@ -664,7 +751,7 @@ class ArgumentsTests: XCTestCase {
         }
         XCTAssertEqual(formatOptions.indent, "  ")
         XCTAssertEqual(formatOptions.linebreak, "\r\n")
-        XCTAssertTrue(formatOptions.allowInlineSemicolons)
+        XCTAssertEqual(formatOptions.semicolons, .inlineOnly)
     }
 
     func testAddArgumentsDoesntBreakSwiftVersion() throws {
@@ -725,78 +812,88 @@ class ArgumentsTests: XCTestCase {
     }
 
     func testParseNoSpaceOperatorsOption() throws {
-        let options = try Options(["nospaceoperators": "...,..<"], in: "")
+        let options = try Options(["no-space-operators": "...,..<"], in: "")
         XCTAssertEqual(options.formatOptions?.noSpaceOperators, ["...", "..<"])
     }
 
     func testParseNoWrapOperatorsOption() throws {
-        let options = try Options(["nowrapoperators": ".,:,*"], in: "")
+        let options = try Options(["no-wrap-operators": ".,:,*"], in: "")
         XCTAssertEqual(options.formatOptions?.noWrapOperators, [".", ":", "*"])
     }
 
     func testParseModifierOrderOption() throws {
-        let options = try Options(["modifierorder": "private(set),public,unowned"], in: "")
+        let options = try Options(["modifier-order": "private(set),public,unowned"], in: "")
         XCTAssertEqual(options.formatOptions?.modifierOrder, ["private(set)", "public", "unowned"])
     }
 
     func testParseParameterizedModifierOrderOption() throws {
-        let options = try Options(["modifierorder": "unowned(unsafe),unowned(safe)"], in: "")
+        let options = try Options(["modifier-order": "unowned(unsafe),unowned(safe)"], in: "")
         XCTAssertEqual(options.formatOptions?.modifierOrder, ["unowned(unsafe)", "unowned(safe)"])
     }
 
     func testParseInvalidModifierOrderOption() throws {
-        XCTAssertThrowsError(try Options(["modifierorder": "unknowned"], in: "")) { error in
-            XCTAssertEqual("\(error)", "'unknowned' is not a valid modifier (did you mean 'unowned'?) in --modifierorder")
+        XCTAssertThrowsError(try Options(["modifier-order": "unknowned"], in: "")) { error in
+            XCTAssertEqual("\(error)", "Unsupported --modifier-order value 'unknowned'. Did you mean 'unowned'?")
         }
     }
 
     func testParseSpecifierOrderOption() throws {
-        let options = try Options(["specifierorder": "private(set),public"], in: "")
+        let options = try Options(["specifier-order": "private(set),public"], in: "")
         XCTAssertEqual(options.formatOptions?.modifierOrder, ["private(set)", "public"])
     }
 
     func testParseSwiftVersionOption() throws {
-        let options = try Options(["swiftversion": "4.2"], in: "")
+        let options = try Options(["swift-version": "4.2"], in: "")
         XCTAssertEqual(options.formatOptions?.swiftVersion, "4.2")
     }
 
     // MARK: parse rules
 
     func testParseRulesCaseInsensitive() throws {
-        let rules = try parseRules("strongoutlets")
+        let rules = try parseRules("strongoutlets", ignoreUnknown: false)
         XCTAssertEqual(rules, ["strongOutlets"])
     }
 
     func testParseAllRule() throws {
-        let rules = try parseRules("all")
+        let rules = try parseRules("all", ignoreUnknown: false)
         XCTAssertEqual(rules, FormatRules.all.compactMap {
             $0.isDeprecated ? nil : $0.name
         })
     }
 
     func testParseInvalidRuleThrows() {
-        XCTAssertThrowsError(try parseRules("strongOutlet")) { error in
+        XCTAssertThrowsError(try parseRules("strongOutlet", ignoreUnknown: false)) { error in
             XCTAssertEqual("\(error)", "Unknown rule 'strongOutlet'. Did you mean 'strongOutlets'?")
         }
     }
 
     func testParseOptionAsRuleThrows() {
-        XCTAssertThrowsError(try parseRules("importgrouping")) { error in
+        XCTAssertThrowsError(try parseRules("import-grouping", ignoreUnknown: false)) { error in
             XCTAssert("\(error)".contains("'sortImports'"))
         }
+    }
+
+    func testSuppressInvalidRuleError() throws {
+        let rules = try parseRules("strongOutlet,isEmpty", ignoreUnknown: true)
+        XCTAssertEqual(rules, ["isEmpty"])
+    }
+
+    func testSuppressOptionAsRuleError() throws {
+        let rules = try parseRules("import-grouping,isEmpty", ignoreUnknown: true)
+        XCTAssertEqual(rules, ["isEmpty"])
     }
 
     // MARK: lintonly
 
     func testLintonlyRulesContain() throws {
-        let options = try Options(["lint": "", "lintonly": "wrapEnumCases"], in: "")
+        let options = try Options(["lint": "", "lint-only": "wrapEnumCases"], in: "")
         XCTAssert(options.rules?.contains("wrapEnumCases") == true)
         let arguments = argumentsFor(options)
         XCTAssertEqual(arguments, ["lint": "", "enable": "wrapEnumCases"])
     }
 
     func testLintonlyRulesDontContain() throws {
-        let options = try Options(["lintonly": "unusedArguments"], in: "")
+        let options = try Options(["lint-only": "unusedArguments"], in: "")
         XCTAssert(options.rules?.contains("unusedArguments") == false)
         let arguments = argumentsFor(options)
         XCTAssertEqual(arguments, ["disable": "unusedArguments"])
@@ -804,13 +901,13 @@ class ArgumentsTests: XCTestCase {
 
     func testLintonlyMergeOptionsAdd() throws {
         var options = try Options(["lint": "", "disable": "unusedArguments"], in: "")
-        try options.addArguments(["lintonly": "unusedArguments"], in: "")
+        try options.addArguments(["lint-only": "unusedArguments"], in: "")
         XCTAssert(options.rules?.contains("unusedArguments") == true)
     }
 
     func testLintonlyMergeOptionsRemove() throws {
         var options = try Options(["enable": "wrapEnumCases"], in: "")
-        try options.addArguments(["lintonly": "wrapEnumCases"], in: "")
+        try options.addArguments(["lint-only": "wrapEnumCases"], in: "")
         XCTAssert(options.rules?.contains("wrapEnumCases") == false)
     }
 
@@ -842,7 +939,7 @@ class ArgumentsTests: XCTestCase {
     }
 
     func testDeprecatedOptionWarning() {
-        let warnings = warningsForArguments(["insertlines": "enabled"])
+        let warnings = warningsForArguments(["insert-lines": "enabled"])
         XCTAssertEqual(warnings.count, 1)
         XCTAssert((warnings.first ?? "").contains("option is deprecated"))
     }
@@ -850,7 +947,7 @@ class ArgumentsTests: XCTestCase {
     func testUnusedOptionWarning() {
         let warnings = warningsForArguments([
             "disable": "sortImports",
-            "importgrouping": "testable-bottom",
+            "import-grouping": "testable-bottom",
         ])
         XCTAssertEqual(warnings.count, 1)
         XCTAssert((warnings.first ?? "").contains("option has no effect"))
@@ -859,15 +956,15 @@ class ArgumentsTests: XCTestCase {
     func testLintOnlyRuleDoesntTriggerUnusedOptionWarning() {
         let warnings = warningsForArguments([
             "lintonly": "sortImports",
-            "importgrouping": "testable-bottom",
+            "import-grouping": "testable-bottom",
         ])
         XCTAssertEqual(warnings, [])
     }
 
     func testLintOnlyRuleDoesntTriggerUnusedOptionWarning2() throws {
         let options = try Options([
-            "lintonly": "sortImports",
-            "importgrouping": "testable-bottom",
+            "lint-only": "sortImports",
+            "import-grouping": "testable-bottom",
         ], in: "")
         let arguments = argumentsFor(options, excludingDefaults: true)
 

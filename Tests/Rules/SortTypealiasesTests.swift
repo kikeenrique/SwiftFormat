@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class SortTypealiasesTests: XCTestCase {
+final class SortTypealiasesTests: XCTestCase {
     func testSortSingleLineTypealias() {
         let input = """
         typealias Placeholders = Foo & Bar & Quux & Baaz
@@ -96,28 +96,8 @@ class SortTypealiasesTests: XCTestCase {
         let input = """
         typealias Dependencies
             = any FooProviding
-            & any BarProviding
-            & any BaazProviding
-            & any QuuxProviding
-        """
-
-        let output = """
-        typealias Dependencies
-            = any BaazProviding
-            & any BarProviding
-            & any FooProviding
-            & any QuuxProviding
-        """
-
-        testFormatting(for: input, output, rule: .sortTypealiases)
-    }
-
-    func testSortWrappedMultilineTypealiasWithMixedAny() {
-        let input = """
-        typealias Dependencies
-            = any FooProviding
             & BarProviding
-            & any BaazProviding
+            & BaazProviding
             & QuuxProviding
         """
 
@@ -125,7 +105,7 @@ class SortTypealiasesTests: XCTestCase {
         typealias Dependencies
             = any BaazProviding
             & BarProviding
-            & any FooProviding
+            & FooProviding
             & QuuxProviding
         """
 
@@ -216,28 +196,41 @@ class SortTypealiasesTests: XCTestCase {
         testFormatting(for: input, output, rule: .sortTypealiases)
     }
 
-    func testSortSingleLineTypealiasBeginningWithAny() {
-        let input = "typealias Placeholders = any Bar & Foo"
-        testFormatting(for: input, rule: .sortTypealiases)
+    func testSortSingleLineTypealiasWithLeadingAny() {
+        let input = """
+        typealias Wrapped = any UIView & UIContentView
+        """
+        let output = """
+        typealias Wrapped = any UIContentView & UIView
+        """
+        testFormatting(for: input, output, rule: .sortTypealiases)
     }
 
     func testCollectionTypealiasWithArrayOfExistentialTypes() {
-        let input = "public typealias Parameters = [any Any & Sendable]"
+        let input = """
+        public typealias Parameters = [any Any & Sendable]
+        """
         testFormatting(for: input, rule: .sortTypealiases)
     }
 
     func testCollectionTypealiasWithDictionaryOfExistentialTypes() {
-        let input = "public typealias Parameters = [any Hashable & Sendable: any Any & Sendable]"
+        let input = """
+        public typealias Parameters = [any Hashable & Sendable: any Any & Sendable]
+        """
         testFormatting(for: input, rule: .sortTypealiases)
     }
 
     func testCollectionTypealiasWithOptionalExistentialType() {
-        let input = "public typealias Parameters = (Hashable & Sendable)?"
+        let input = """
+        public typealias Parameters = (Hashable & Sendable)?
+        """
         testFormatting(for: input, rule: .sortTypealiases)
     }
 
     func testCollectionTypealiasWithGenericExistentialType() {
-        let input = "public typealias Parameters = Result<any Hashable & Sendable, any Error & Sendable>"
+        let input = """
+        public typealias Parameters = Result<any Hashable & Sendable, any Error & Sendable>
+        """
         testFormatting(for: input, rule: .sortTypealiases)
     }
 

@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class EnumNamespacesTests: XCTestCase {
+final class EnumNamespacesTests: XCTestCase {
     func testEnumNamespacesClassAsProtocolRestriction() {
         let input = """
         @objc protocol Foo: class {
@@ -20,7 +20,9 @@ class EnumNamespacesTests: XCTestCase {
     }
 
     func testEnumNamespacesConformingOtherType() {
-        let input = "private final class CustomUITableViewCell: UITableViewCell {}"
+        let input = """
+        private final class CustomUITableViewCell: UITableViewCell {}
+        """
         testFormatting(for: input, rule: .enumNamespaces)
     }
 
@@ -283,7 +285,7 @@ class EnumNamespacesTests: XCTestCase {
     func testEnumNamespacesDoesNothingIfSelfAssignedInternally() {
         let input = """
         class Foo {
-            public static func bar() {
+            static func bar() {
                 let bundle = Bundle(for: self)
             }
         }
@@ -294,7 +296,7 @@ class EnumNamespacesTests: XCTestCase {
     func testEnumNamespacesDoesNothingIfSelfAssignedInternally2() {
         let input = """
         class Foo {
-            public static func bar() {
+            static func bar() {
                 let `class` = self
             }
         }
@@ -305,7 +307,7 @@ class EnumNamespacesTests: XCTestCase {
     func testEnumNamespacesDoesNothingIfSelfAssignedInternally3() {
         let input = """
         class Foo {
-            public static func bar() {
+            static func bar() {
                 let `class` = Foo.self
             }
         }
@@ -337,7 +339,7 @@ class EnumNamespacesTests: XCTestCase {
     func testClassNotReplacedByEnum() {
         let input = """
         class Foo {
-            public static let bar = "bar"
+            static let bar = "bar"
         }
         """
         let options = FormatOptions(enumNamespaces: .structsOnly)
@@ -451,5 +453,71 @@ class EnumNamespacesTests: XCTestCase {
         }
         """
         testFormatting(for: input, rule: .enumNamespaces)
+    }
+
+    func testEnumNamespacesNotAppliedToStructWithInstanceSubscript() {
+        let input = """
+        struct MyStruct {
+            subscript(key: String) -> String {
+                return key
+            }
+        }
+        """
+        testFormatting(for: input, rule: .enumNamespaces, exclude: [.unusedArguments])
+    }
+
+    func testEnumNamespacesNotAppliedToSwiftTestingSuiteWithTestMethod() {
+        let input = """
+        import Testing
+
+        struct MyTests {
+            @Test func myTest() {}
+        }
+        """
+        testFormatting(for: input, rule: .enumNamespaces)
+    }
+
+    func testEnumNamespacesNotAppliedToSwiftTestingSuiteWithStaticTestMethod() {
+        let input = """
+        import Testing
+
+        struct MyTests {
+            @Test static func myTest() {}
+        }
+        """
+        testFormatting(for: input, rule: .enumNamespaces)
+    }
+
+    func testEnumNamespacesAppliedToStaticOnlyStructWithoutTestingImport() {
+        let input = """
+        struct MyTests {
+            static func myTest() {}
+        }
+        """
+        let output = """
+        enum MyTests {
+            static func myTest() {}
+        }
+        """
+        testFormatting(for: input, output, rule: .enumNamespaces)
+    }
+
+    func testEnumNamespacesNotAppliedAfterRedundantSuiteAttributeRemoved() {
+        let input = """
+        import Testing
+
+        @Suite
+        struct MyTests {
+            @Test static func myTest() {}
+        }
+        """
+        let output = """
+        import Testing
+
+        struct MyTests {
+            @Test static func myTest() {}
+        }
+        """
+        testFormatting(for: input, [output], rules: [.enumNamespaces, .redundantSwiftTestingSuite])
     }
 }

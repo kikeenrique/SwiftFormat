@@ -12,7 +12,7 @@ public extension FormatRule {
     /// Removes explicit type declarations from initialization declarations
     static let redundantType = FormatRule(
         help: "Remove redundant type from variable declarations.",
-        options: ["propertytypes"]
+        options: ["property-types"]
     ) { formatter in
         formatter.forEach(.operator("=", .infix)) { i, _ in
             guard let keyword = formatter.lastSignificantKeyword(at: i),
@@ -54,13 +54,13 @@ public extension FormatRule {
             // Explicit type can't be safely removed from @Model classes
             // https://github.com/nicklockwood/SwiftFormat/issues/1649
             if !isInferred,
-               let declarationKeywordIndex = declarationKeywordIndex,
+               let declarationKeywordIndex,
                formatter.modifiersForDeclaration(at: declarationKeywordIndex, contains: "@Model")
             {
                 return
             }
 
-            // Removes a type already processed by `compare(typeStartingAfter:withTypeStartingAfter:)`
+            /// Removes a type already processed by `compare(typeStartingAfter:withTypeStartingAfter:)`
             func removeType(after indexBeforeStartOfType: Int, i: Int, j: Int, wasValue: Bool) {
                 if isInferred {
                     formatter.removeTokens(in: colonIndex ... typeEndIndex)
@@ -129,21 +129,31 @@ public extension FormatRule {
                 let (matches, i, j, wasValue) = formatter.compare(typeStartingAfter: equalsIndex, withTypeStartingAfter: colonIndex, typeEndIndex: typeEndIndex)
                 if matches {
                     removeType(after: equalsIndex, i: i, j: j, wasValue: wasValue)
+                } else if isInferred,
+                          let tokenAfterEquals = formatter.index(of: .nonSpaceOrCommentOrLinebreak, after: equalsIndex),
+                          formatter.tokens[tokenAfterEquals] == .startOfScope("["),
+                          let (baseTypeIndex, openAngle, argTypeIndex) = formatter.singleGenericArgType(afterColon: colonIndex, typeEndIndex: typeEndIndex),
+                          formatter.tokens[baseTypeIndex] == .identifier("Set"),
+                          let elementType = formatter.inferredArrayLiteralElementType(at: tokenAfterEquals),
+                          formatter.tokens[argTypeIndex] == elementType
+                {
+                    // The generic argument is redundant (inferred from the array literal)
+                    formatter.removeTokens(in: openAngle ... typeEndIndex)
                 }
             }
         }
     } examples: {
         """
         ```diff
-        // with --propertytypes inferred
+          // with --propertytypes inferred
         - let view: UIView = UIView()
         + let view = UIView()
 
-        // with --propertytypes explicit
+          // with --propertytypes explicit
         - let view: UIView = UIView()
         + let view: UIView = .init()
 
-        // with --propertytypes infer-locals-only
+          // with --propertytypes infer-locals-only
           class Foo {
         -     let view: UIView = UIView()
         +     let view: UIView = .init()
@@ -154,7 +164,7 @@ public extension FormatRule {
               }
           }
 
-        // Swift 5.9+, with --propertytypes inferred (SE-0380)
+          // Swift 5.9+, with --propertytypes inferred (SE-0380)
         - let foo: Foo = if condition {
         + let foo = if condition {
               Foo("foo")
@@ -162,7 +172,7 @@ public extension FormatRule {
               Foo("bar")
           }
 
-        // Swift 5.9+, with --propertytypes explicit (SE-0380)
+          // Swift 5.9+, with --propertytypes explicit (SE-0380)
           let foo: Foo = if condition {
         -     Foo("foo")
         +     .init("foo")
@@ -176,7 +186,7 @@ public extension FormatRule {
 }
 
 extension Formatter {
-    // Compares whether or not two types are equivalent
+    /// Compares whether or not two types are equivalent
     func compare(typeStartingAfter j: Int, withTypeStartingAfter i: Int, typeEndIndex: Int)
         -> (matches: Bool, i: Int, j: Int, wasValue: Bool)
     {
@@ -228,6 +238,61 @@ extension Formatter {
         }
 
         return (true, i, j, wasValue)
+    }
+
+    /// For a type annotation of the form `TypeName<SingleArg>`, returns the indices of
+    /// the base type, the opening `<`, and the generic argument token.
+    /// Returns nil if the type has multiple generic arguments, a complex argument type,
+    /// or no generic argument at all.
+    func singleGenericArgType(afterColon colonIndex: Int, typeEndIndex: Int)
+        -> (baseTypeIndex: Int, openAngle: Int, argTypeIndex: Int)?
+    {
+        guard let baseTypeIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: colonIndex),
+              case .identifier = tokens[baseTypeIndex],
+              let openAngle = index(of: .nonSpaceOrCommentOrLinebreak, after: baseTypeIndex),
+              tokens[openAngle] == .startOfScope("<"),
+              let argTypeIndex = index(of: .nonSpaceOrCommentOrLinebreak, after: openAngle),
+              case .identifier = tokens[argTypeIndex],
+              let closeAngle = index(of: .nonSpaceOrCommentOrLinebreak, after: argTypeIndex),
+              closeAngle == typeEndIndex,
+              tokens[closeAngle] == .endOfScope(">")
+        else { return nil }
+        return (baseTypeIndex, openAngle, argTypeIndex)
+    }
+
+    /// Returns the inferred element type for a homogeneous array literal, or nil if the
+    /// array is empty, contains non-literal elements, or has mixed element types.
+    func inferredArrayLiteralElementType(at index: Int) -> Token? {
+        guard tokens[index] == .startOfScope("["),
+              let endIndex = endOfScope(at: index)
+        else { return nil }
+
+        var elementType: Token? = nil
+        var i = index
+
+        while let nextIndex = self.index(of: .nonSpaceOrCommentOrLinebreak, after: i),
+              nextIndex < endIndex
+        {
+            let token = tokens[nextIndex]
+
+            if token == .delimiter(",") {
+                i = nextIndex
+                continue
+            }
+
+            let inferred = typeToken(forValueToken: token)
+            // typeToken returns the token unchanged for non-literals; skip those
+            guard inferred != token else { return nil }
+
+            if let existing = elementType {
+                if existing != inferred { return nil }
+            } else {
+                elementType = inferred
+            }
+            i = token.isStringDelimiter ? (endOfScope(at: nextIndex) ?? nextIndex) : nextIndex
+        }
+
+        return elementType
     }
 
     /// Returns the equivalent type token for a given value token

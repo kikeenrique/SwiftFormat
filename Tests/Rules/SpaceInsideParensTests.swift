@@ -9,16 +9,24 @@
 import XCTest
 @testable import SwiftFormat
 
-class SpaceInsideParensTests: XCTestCase {
+final class SpaceInsideParensTests: XCTestCase {
     func testSpaceInsideParens() {
-        let input = "( 1, ( 2, 3 ) )"
-        let output = "(1, (2, 3))"
+        let input = """
+        ( 1, ( 2, 3 ) )
+        """
+        let output = """
+        (1, (2, 3))
+        """
         testFormatting(for: input, output, rule: .spaceInsideParens)
     }
 
     func testSpaceBeforeCommentInsideParens() {
-        let input = "( /* foo */ 1, 2 )"
-        let output = "( /* foo */ 1, 2)"
+        let input = """
+        ( /* foo */ 1, 2 )
+        """
+        let output = """
+        ( /* foo */ 1, 2)
+        """
         testFormatting(for: input, output, rule: .spaceInsideParens)
     }
 }

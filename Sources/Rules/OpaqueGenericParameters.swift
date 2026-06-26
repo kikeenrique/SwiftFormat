@@ -16,7 +16,7 @@ public extension FormatRule {
         primary associated types for common standard library types, so definitions like
         `T where T: Collection, T.Element == Foo` are updated to `some Collection<Foo>`.
         """,
-        options: ["someany"]
+        options: ["some-any"]
     ) { formatter in
         formatter.forEach(.keyword) { keywordIndex, keyword in
             guard // Opaque generic parameter syntax is only supported in Swift 5.7+
@@ -110,8 +110,8 @@ public extension FormatRule {
                 // but with `-> some Fooable` the generic type is specified by the function implementation.
                 // Because those represent different concepts, we can't convert between them,
                 // so have to mark the generic type as ineligible if it appears in the return type.
-                if let returnType = declaration.returnType?.name,
-                   tokenize(returnType).contains(where: { $0.string == genericType.name })
+                if let returnType = declaration.returnType,
+                   returnType.tokens.contains(where: { $0.string == genericType.name })
                 {
                     genericType.eligibleToRemove = false
                     continue
@@ -145,6 +145,16 @@ public extension FormatRule {
                        [.operator("->", .infix), .keyword("throws"), .identifier("async")].contains(tokenAfterParen),
                        // Check if the closure type parameters contains this generic type
                        formatter.tokens[tokenIndex ... endOfScope].contains(where: { $0.string == genericType.name })
+                    {
+                        genericType.eligibleToRemove = false
+                    }
+                }
+
+                // If the generic is used as a generic argument in an `any` existential type,
+                // it can't be replaced with a `some` type.
+                for argument in declaration.arguments {
+                    if argument.type.tokens.contains(where: { $0.string == "any" }),
+                       argument.type.tokens.contains(where: { $0.string == genericType.name })
                     {
                         genericType.eligibleToRemove = false
                     }
@@ -198,7 +208,7 @@ public extension FormatRule {
                 if let tokenAfterWhereKeyword = formatter.index(of: .nonSpaceOrLinebreak, after: whereClauseRange.lowerBound),
                    whereClauseRange.upperBound <= tokenAfterWhereKeyword
                 {
-                    formatter.removeTokens(in: whereClauseRange.range)
+                    formatter.removeTokens(in: whereClauseRange)
                 }
 
                 // remove trailing comma
@@ -271,7 +281,7 @@ public extension FormatRule {
               print(value)
           }
 
-        // With `--someany enabled` (the default)
+          // With `--some-any enabled` (the default)
         - func handle<T>(_ value: T) {
         + func handle(_ value: some Any) {
               print(value)

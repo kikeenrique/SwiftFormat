@@ -15,8 +15,8 @@ public extension FormatRule {
         and declarations between // swiftformat:sort:begin and
         // swiftformat:sort:end comments.
         """,
-        options: ["sortedpatterns"],
-        sharedOptions: ["linebreaks", "organizetypes", "structthreshold", "classthreshold", "enumthreshold", "extensionlength"]
+        options: ["sorted-patterns"],
+        sharedOptions: ["linebreaks", "organize-types", "struct-threshold", "class-threshold", "enum-threshold", "extension-threshold"]
     ) { formatter in
         formatter.forEachToken(
             where: {
@@ -167,11 +167,7 @@ public extension FormatRule {
         +     case upsellB
           }
 
-        config:
-        ```
-            sortedpatterns: 'Feature'
-        ```
-
+          /// With --sortedpatterns Feature
           enum FeatureFlags {
         -     case upsellB
         -     case fooFeature

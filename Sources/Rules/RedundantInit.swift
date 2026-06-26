@@ -17,10 +17,10 @@ public extension FormatRule {
         formatter.forEach(.identifier("init")) { initIndex, _ in
             guard let dotIndex = formatter.index(of: .nonSpaceOrCommentOrLinebreak, before: initIndex, if: {
                 $0.isOperator(".")
-            }), let openParenIndex = formatter.index(of: .nonSpaceOrLinebreak, after: initIndex, if: {
-                $0 == .startOfScope("(")
-            }), let closeParenIndex = formatter.index(of: .endOfScope(")"), after: openParenIndex),
-            formatter.last(.nonSpaceOrCommentOrLinebreak, before: closeParenIndex) != .delimiter(":"),
+            }), let openParenOrOpenBraceIndex = formatter.index(of: .nonSpaceOrLinebreak, after: initIndex, if: {
+                $0 == .startOfScope("(") || $0 == .startOfScope("{")
+            }), let closeParenOrCloseBraceIndex = formatter.endOfScope(at: openParenOrOpenBraceIndex),
+            formatter.last(.nonSpaceOrCommentOrLinebreak, before: closeParenOrCloseBraceIndex) != .delimiter(":"),
             let prevIndex = formatter.index(of: .nonSpaceOrCommentOrLinebreak, before: dotIndex),
             let prevToken = formatter.token(at: prevIndex),
             formatter.isValidEndOfType(at: prevIndex),
@@ -37,13 +37,21 @@ public extension FormatRule {
             let type = formatter.parseType(at: startOfTypeIndex),
             // Filter out values that start with a lowercase letter.
             // This covers edge cases like `super.init()`, where the `init` is not redundant.
-            let firstChar = type.name.components(separatedBy: ".").last?.first,
+            let firstChar = type.string.components(separatedBy: ".").last?.first,
             firstChar != "$",
             String(firstChar).uppercased() == String(firstChar)
             else { return }
 
             let lineStart = formatter.startOfLine(at: prevIndex, excludingIndent: true)
             if [.startOfScope("#if"), .keyword("#elseif")].contains(formatter.tokens[lineStart]) {
+                return
+            }
+            // In Swift < 6.4, trailing closure syntax is not allowed after array/dictionary
+            // literals (e.g. `[String] { "foo" }`). This was fixed in SE-0508 for Swift 6.4+.
+            if formatter.tokens[openParenOrOpenBraceIndex] == .startOfScope("{"),
+               prevToken == .endOfScope("]"),
+               formatter.options.swiftVersion < "6.4"
+            {
                 return
             }
             var j = dotIndex
@@ -61,8 +69,16 @@ public extension FormatRule {
                     return
                 }
             }
-            formatter.removeTokens(in: initIndex + 1 ..< openParenIndex)
-            formatter.removeTokens(in: dotIndex ... initIndex)
+
+            if formatter.tokens[openParenOrOpenBraceIndex] == .startOfScope("(") {
+                formatter.removeTokens(in: initIndex + 1 ..< openParenOrOpenBraceIndex)
+            }
+
+            let endOfTypeIndex = (startOfTypeIndex ..< dotIndex).last(where: {
+                formatter.tokens[$0].isNonSpaceOrCommentOrLinebreak
+            }) ?? startOfTypeIndex
+
+            formatter.removeTokens(in: (endOfTypeIndex + 1) ... initIndex)
         }
     } examples: {
         """

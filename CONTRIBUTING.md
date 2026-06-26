@@ -65,6 +65,26 @@ Tests are run automatically on all pull requests, branches and tags. These are t
 
 There is a separate Performance Tests scheme that you should run manually if your code changes are likely to affect performance.
 
+Test cases for individual rules can be ran via the command line using the `./Scripts/test_rule.sh` script. For example:
+
+```sh
+$ ./Scripts/test_rule.sh blankLinesAtStartOfScope
+$ ./Scripts/test_rule.sh indent
+$ ./Scripts/test_rule.sh wrap
+```
+
+## Tips
+
+* Use existing helpers in `ParsingHelpers.swift` or `FormattingHelpers.swift` where possible. There are existing parsing helpers for many parts of the Swift grammar, like: 
+  * Types (`parseType(at:)`) 
+  * Declarations (`parseDeclarations()`)
+  * Expressions (`parseExpressionRange(startingAt:)`)
+  * Properties (`parsePropertyDeclaration(atIntroducerIndex:)`)
+  * Functions (`parseFunctionDeclaration(keywordIndex:)`)
+  
+* Define helpers in extensions on `Formatter` at the bottom of the Rule file. These should be `internal` to improve discoverability. Helpers used by multiple rules should be moved to `ParsingHelpers`.
+  * Before writing new parsing helpers, consider checking if any existing rule has parsing helpers that could be reused.
+
 ## Prerelease builds
 
 If you contribute a new rule or option, it would be published in the following major version release. To start using the new rule or option right away in your own project, you could use a prerelease build of the `develop` branch. More information is available [here](https://github.com/nicklockwood/SwiftFormat#prerelease-builds).
@@ -77,22 +97,22 @@ If you contribute a new rule or option, it would be published in the following m
 
 ## Release Process
 
+
 This is relevant only to maintainers:
 
-* Update version number in SwiftFormat.swift + 3 targets
-* Update CHANGELOG.md
-* Update SwiftFormat.podspec.json
+Run `./Scripts/prepare_release.sh VERSION_NUMBER`. This script:
+
+* Updates version number in SwiftFormat.swift + 3 targets
+* Updates SwiftFormat.podspec.json
+* Creates a placeholder entry in CHANGELOG.md
 * Run tests and ensure they pass
-* Select SwiftFormat (Command Line Tool) and run Product > Archive
-* Replace binary in CommandLineTool directory
-* Select SwiftFormat for Xcode and run Product > Archive
-* Notarize and export built app
-  * This step requires App Store Connect access, so only Nick can do this.
+* Archives SwiftFormat (Command Line Tool)
+* Replaced binary in CommandLineTool directory
+
+Then complete the following steps manually:
+
+* Fill out the CHANGELOG.md entry
 * Tag commit and push to main
-* pod trunk push --allow-warnings
-* Run Build for Windows and download binaries
-* Unzip Windows msi zips and rename
 * Publish a new release
-* Attach all binaries to release
-  * The artifact bundle, macOS executable, and Linux executables are uploaded to the release automatically.
-* Create and Publish Docker image
+  * All binaries are built and uploaded to the release automatically
+* pod trunk push --allow-warnings

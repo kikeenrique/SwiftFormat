@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class BlankLineAfterImportsTests: XCTestCase {
+final class BlankLineAfterImportsTests: XCTestCase {
     func testBlankLineAfterImport() {
         let input = """
         import ModuleA
@@ -105,6 +105,6 @@ class BlankLineAfterImportsTests: XCTestCase {
 
         public class Foo {}
         """
-        testFormatting(for: input, output, rule: .blankLineAfterImports)
+        testFormatting(for: input, output, rule: .blankLineAfterImports, exclude: [.sortImports])
     }
 }

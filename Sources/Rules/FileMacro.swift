@@ -11,7 +11,7 @@ import Foundation
 public extension FormatRule {
     static let fileMacro = FormatRule(
         help: "Prefer either #file or #fileID, which have the same behavior in Swift 6 and later.",
-        options: ["filemacro"]
+        options: ["file-macro"]
     ) { formatter in
         // In the Swift 6 lanaguage mode and later, `#file` and `#fileID` have the same behavior.
         guard formatter.options.languageMode >= "6" else {
@@ -30,11 +30,11 @@ public extension FormatRule {
     } examples: {
         """
         ```diff
-        // --filemacro #file
+          // --filemacro #file
         - func foo(file: StaticString = #fileID) { ... }
         + func foo(file: StaticString = #file) { ... }
 
-        // --filemacro #fileID
+          // --filemacro #fileID
         - func foo(file: StaticString = #file) { ... }
         + func foo(file: StaticString = #fileID) { ... }
         ```

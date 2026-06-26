@@ -6,8 +6,7 @@ import Foundation
 public extension FormatRule {
     /// Removes types conforming `EnvironmentKey` and replaces them with the @Entry macro
     static let environmentEntry = FormatRule(
-        help: "Updates SwiftUI `EnvironmentValues` definitions to use the @Entry macro.",
-        disabledByDefault: true
+        help: "Updates SwiftUI `EnvironmentValues` definitions to use the @Entry macro."
     ) { formatter in
         // The @Entry macro is only available in Xcode 16 therefore this rule requires the same Xcode version to work.
         guard formatter.options.swiftVersion >= "6.0" else { return }
@@ -70,7 +69,7 @@ extension Formatter {
         for declaration in declarations {
             guard let typeDeclaration = declaration.asTypeDeclaration,
                   typeDeclaration.keyword == "struct" || typeDeclaration.keyword == "enum",
-                  typeDeclaration.conformances.contains(where: { $0.conformance == "EnvironmentKey" }),
+                  typeDeclaration.conformances.contains(where: { $0.conformance.string == "EnvironmentKey" }),
                   let keyName = typeDeclaration.name,
                   typeDeclaration.body.count == 1,
                   let defaultValueDeclaration = typeDeclaration.body.first(where: {

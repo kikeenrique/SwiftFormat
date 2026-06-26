@@ -9,48 +9,70 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantLetTests: XCTestCase {
+final class RedundantLetTests: XCTestCase {
     func testRemoveRedundantLet() {
-        let input = "let _ = bar {}"
-        let output = "_ = bar {}"
+        let input = """
+        let _ = bar {}
+        """
+        let output = """
+        _ = bar {}
+        """
         testFormatting(for: input, output, rule: .redundantLet)
     }
 
     func testNoRemoveLetWithType() {
-        let input = "let _: String = bar {}"
+        let input = """
+        let _: String = bar {}
+        """
         testFormatting(for: input, rule: .redundantLet)
     }
 
     func testRemoveRedundantLetInCase() {
-        let input = "if case .foo(let _) = bar {}"
-        let output = "if case .foo(_) = bar {}"
+        let input = """
+        if case .foo(let _) = bar {}
+        """
+        let output = """
+        if case .foo(_) = bar {}
+        """
         testFormatting(for: input, output, rule: .redundantLet, exclude: [.redundantPattern])
     }
 
     func testRemoveRedundantVarsInCase() {
-        let input = "if case .foo(var _, var /* unused */ _) = bar {}"
-        let output = "if case .foo(_, /* unused */ _) = bar {}"
+        let input = """
+        if case .foo(var _, var /* unused */ _) = bar {}
+        """
+        let output = """
+        if case .foo(_, /* unused */ _) = bar {}
+        """
         testFormatting(for: input, output, rule: .redundantLet)
     }
 
     func testNoRemoveLetInIf() {
-        let input = "if let _ = foo {}"
+        let input = """
+        if let _ = foo {}
+        """
         testFormatting(for: input, rule: .redundantLet)
     }
 
     func testNoRemoveLetInMultiIf() {
-        let input = "if foo == bar, /* comment! */ let _ = baz {}"
+        let input = """
+        if foo == bar, /* comment! */ let _ = baz {}
+        """
         testFormatting(for: input, rule: .redundantLet)
     }
 
     func testNoRemoveLetInGuard() {
-        let input = "guard let _ = foo else {}"
+        let input = """
+        guard let _ = foo else {}
+        """
         testFormatting(for: input, rule: .redundantLet,
                        exclude: [.wrapConditionalBodies])
     }
 
     func testNoRemoveLetInWhile() {
-        let input = "while let _ = foo {}"
+        let input = """
+        while let _ = foo {}
+        """
         testFormatting(for: input, rule: .redundantLet)
     }
 
@@ -80,7 +102,7 @@ class RedundantLetTests: XCTestCase {
 
     func testNoRemoveLetInIfStatementInViewBuilder() {
         let input = """
-        VStack {
+        VStack(spacing: 0) {
             if visible == "YES" {
                 let _ = print("")
             }
@@ -129,7 +151,9 @@ class RedundantLetTests: XCTestCase {
     }
 
     func testNoRemoveAsyncLet() {
-        let input = "async let _ = foo()"
+        let input = """
+        async let _ = foo()
+        """
         testFormatting(for: input, rule: .redundantLet)
     }
 
@@ -146,6 +170,21 @@ class RedundantLetTests: XCTestCase {
         let input = """
         let foo = bar { @Sendable
             let _ = try await baz()
+        }
+        """
+        testFormatting(for: input, rule: .redundantLet)
+    }
+
+    func testPreserveLetInPreviewMacro() {
+        let input = """
+        #Preview {
+            let _ = 1234
+            Text("Test")
+        }
+
+        #Preview(name: "Test") {
+            let _ = 1234
+            Text("Test")
         }
         """
         testFormatting(for: input, rule: .redundantLet)

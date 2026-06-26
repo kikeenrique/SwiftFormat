@@ -13,7 +13,7 @@ public extension FormatRule {
     static let unusedPrivateDeclarations = FormatRule(
         help: "Remove unused private and fileprivate declarations.",
         disabledByDefault: true,
-        options: ["preservedecls"]
+        options: ["preserve-decls"]
     ) { formatter in
         guard !formatter.options.fragment else { return }
 
@@ -22,7 +22,7 @@ public extension FormatRule {
         //    and it's more difficult to track the usage of other declaration
         //    types like `init`, `subscript`, `operator`, etc.
         let allowlist = ["let", "var", "func", "typealias"]
-        let disallowedModifiers = ["override", "@objc", "@IBAction", "@IBSegueAction", "@IBOutlet", "@IBDesignable", "@IBInspectable", "@NSManaged", "@GKInspectable"]
+        let disallowedModifiers = ["override", "@objc", "@IBAction", "@IBSegueAction", "@IBOutlet", "@IBDesignable", "@IBInspectable", "@NSManaged", "@GKInspectable", "@Test"]
 
         // Collect all of the `private` or `fileprivate` declarations in the file
         var privateDeclarations: [Declaration] = []
@@ -47,8 +47,10 @@ public extension FormatRule {
 
         // Count the usage of each identifier in the file
         var usage: [String: Int] = [:]
-        formatter.forEach(.identifier) { _, token in
-            usage[token.string, default: 0] += 1
+        formatter.forEachToken(onlyWhereEnabled: false) { _, token in
+            if case let .identifier(name) = token {
+                usage[name, default: 0] += 1
+            }
         }
 
         // Remove any private or fileprivate declaration whose name only

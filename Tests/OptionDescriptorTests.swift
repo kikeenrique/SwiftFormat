@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class OptionDescriptorTests: XCTestCase {
+final class OptionDescriptorTests: XCTestCase {
     private typealias OptionArgumentMapping<T> = (optionValue: T, argumentValue: String)
 
     private func validateDescriptorThrowsOptionsError(_ descriptor: OptionDescriptor,
@@ -94,7 +94,7 @@ class OptionDescriptorTests: XCTestCase {
             XCTAssertEqual(descriptor.fromOptions(options), item.argumentValue, "\(testName): Option is transformed to argument")
         }
 
-        if let invalid = invalid {
+        if let invalid {
             options[keyPath: keyPath] = invalid
             XCTAssertEqual(descriptor.fromOptions(options), descriptor.defaultArgument, "\(testName): invalid input return the default value")
         }
@@ -348,5 +348,55 @@ class OptionDescriptorTests: XCTestCase {
         let options1 = FormatOptions(selfRequired: ["foo", "bar", "baz"])
         let options2 = FormatOptions(selfRequired: ["baz", "bar", "foo"])
         XCTAssertEqual(options1.description, options2.description)
+    }
+
+    func testFileMacroCase() {
+        let argument = "#fileID"
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.preferFileMacro.toOptions(argument, &options))
+    }
+
+    // MARK: - importGrouping
+
+    func testImportGroupingAcceptsCommaDelimitedList() {
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.importGrouping.toOptions("access-control,alpha,testable-last", &options))
+        XCTAssertEqual(options.importGrouping, [.accessControl, .alpha, .testableLast])
+    }
+
+    func testImportGroupingAcceptsAlphabetical() {
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.importGrouping.toOptions("alphabetical", &options))
+        XCTAssertTrue(options.importGrouping.contains(.alpha))
+    }
+
+    func testImportGroupingAcceptsAlphabetized() {
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.importGrouping.toOptions("alphabetized", &options))
+        XCTAssertTrue(options.importGrouping.contains(.alpha))
+    }
+
+    func testImportGroupingAcceptsTestableLast() {
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.importGrouping.toOptions("testable-last", &options))
+        XCTAssertEqual(options.importGrouping, [.testableLast])
+    }
+
+    func testImportGroupingAcceptsTestableBottom() {
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.importGrouping.toOptions("testable-bottom", &options))
+        XCTAssertEqual(options.importGrouping, [.testableLast])
+    }
+
+    func testImportGroupingAcceptsTestableFirst() {
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.importGrouping.toOptions("testable-first", &options))
+        XCTAssertEqual(options.importGrouping, [.testableFirst])
+    }
+
+    func testImportGroupingAcceptsTestableTop() {
+        var options: FormatOptions = .default
+        XCTAssertNoThrow(try Descriptors.importGrouping.toOptions("testable-top", &options))
+        XCTAssertEqual(options.importGrouping, [.testableFirst])
     }
 }

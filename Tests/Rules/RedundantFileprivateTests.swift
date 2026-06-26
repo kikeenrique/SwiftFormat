@@ -9,7 +9,7 @@
 import XCTest
 @testable import SwiftFormat
 
-class RedundantFileprivateTests: XCTestCase {
+final class RedundantFileprivateTests: XCTestCase {
     func testFileScopeFileprivateVarChangedToPrivate() {
         let input = """
         fileprivate var foo = "foo"
@@ -129,7 +129,7 @@ class RedundantFileprivateTests: XCTestCase {
         var kFoo: String { return Foo().foo }
         """
         let options = FormatOptions(swiftVersion: "4")
-        testFormatting(for: input, rule: .redundantFileprivate, options: options)
+        testFormatting(for: input, rule: .redundantFileprivate, options: options, exclude: [.wrapFunctionBodies, .wrapPropertyBodies])
     }
 
     func testFileprivateVarNotChangedToPrivateIfAccessedFromCode() {
@@ -246,7 +246,7 @@ class RedundantFileprivateTests: XCTestCase {
         }
         """
         let options = FormatOptions(swiftVersion: "4")
-        testFormatting(for: input, rule: .redundantFileprivate, options: options)
+        testFormatting(for: input, rule: .redundantFileprivate, options: options, exclude: [.singlePropertyPerLine])
     }
 
     func testFileprivateInitChangedToPrivateIfConstructorNotCalledOutsideType() {
@@ -375,7 +375,7 @@ class RedundantFileprivateTests: XCTestCase {
         }
 
         class Bar: Foo, Equatable {
-            override public init() {
+            override init() {
                 super.init()
             }
         }
@@ -391,7 +391,7 @@ class RedundantFileprivateTests: XCTestCase {
         }
 
         class Bar: Baz {
-            override public init() {
+            override init() {
                 super.init()
             }
         }
@@ -402,7 +402,7 @@ class RedundantFileprivateTests: XCTestCase {
         }
 
         class Bar: Baz {
-            override public init() {
+            override init() {
                 super.init()
             }
         }
